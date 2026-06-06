@@ -522,26 +522,39 @@ def _worker_init() -> None:
     _WORKER_RENDERER = Renderer()
 
 
-def _index_document(task: Tuple[str, str]) -> Tuple[str, bool, List[_Row]]:
-    """Render every passage of one document. Returns (rel, ok, rows)."""
+def _index_document(task: Tuple[str, str]) -> Tuple[str, Optional[str], List[_Row]]:
+    """Render every passage of one document.
+
+    Returns (rel, error, rows).  `error` is a short reason string when the
+    document could not be (fully) processed, else None.  A worker must NEVER
+    raise: some corpus files have a citeStructure dapytains cannot handle (e.g.
+    unit names that compile to an invalid regex group), and one bad file must not
+    abort the whole pool — it is skipped and reported instead.
+    """
     rel, path_str = task
     try:
         document = Document(path_str)
-    except Exception:  # noqa: BLE001 - unparseable file
-        return rel, False, []
+    except Exception as exc:  # noqa: BLE001 - unparseable / unsupported file
+        return rel, f"open failed: {type(exc).__name__}: {exc}", []
     meta = read_meta(Path(path_str))
     renderer = _WORKER_RENDERER
     rows: List[_Row] = []
+    errors: List[str] = []
     for tree in document.citeStructure:
-        for unit in walk_reffs(document.get_reffs(tree)):
+        try:
+            units = list(walk_reffs(document.get_reffs(tree)))
+        except Exception as exc:  # noqa: BLE001 - broken citeStructure for this tree
+            errors.append(f"tree '{tree}': {type(exc).__name__}: {exc}")
+            continue
+        for unit in units:
             try:
                 node = document.get_passage(ref_or_start=unit.ref, tree=tree)
                 text = renderer.render(node, "text").strip()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - skip the individual passage
                 continue
             if text:
                 rows.append((rel, tree, unit.ref, meta["title"], meta["author"], text))
-    return rel, True, rows
+    return rel, ("; ".join(errors) if errors else None), rows
 
 
 def build_index(root: Path, db_path: Path, jsonl: Optional[Path] = None,
@@ -567,29 +580,31 @@ def build_index(root: Path, db_path: Path, jsonl: Optional[Path] = None,
         jsonl.parent.mkdir(parents=True, exist_ok=True)
     n_docs = n_passages = n_done = 0
     total = len(tasks)
+    skipped: List[Tuple[str, str]] = []  # (file, reason) for the skip report
 
-    def consume(result: Tuple[str, bool, List[_Row]]) -> None:
+    def consume(result: Tuple[str, Optional[str], List[_Row]]) -> None:
         nonlocal n_docs, n_passages, n_done
-        rel, ok, rows = result
+        rel, error, rows = result
         n_done += 1
-        if not ok:
-            print(f"skip {rel}", file=sys.stderr)
-            return
-        n_docs += 1
-        conn.executemany(
-            "INSERT INTO passages(file, tree, ref, title, author, text)"
-            " VALUES (?,?,?,?,?,?)", rows)
-        if jh:
-            for rel_, tree, ref, title, author, text in rows:
-                jh.write(json.dumps(
-                    {"file": rel_, "tree": tree, "ref": ref,
-                     "title": title, "author": author, "text": text},
-                    ensure_ascii=False) + "\n")
-        n_passages += len(rows)
-        conn.commit()
+        if error:
+            skipped.append((rel, error))
+            print(f"skip {rel}: {error}", file=sys.stderr)
+        if rows:
+            n_docs += 1
+            conn.executemany(
+                "INSERT INTO passages(file, tree, ref, title, author, text)"
+                " VALUES (?,?,?,?,?,?)", rows)
+            if jh:
+                for rel_, tree, ref, title, author, text in rows:
+                    jh.write(json.dumps(
+                        {"file": rel_, "tree": tree, "ref": ref,
+                         "title": title, "author": author, "text": text},
+                        ensure_ascii=False) + "\n")
+            n_passages += len(rows)
+            conn.commit()
         if n_done % 200 == 0 or n_done == total:
             print(f"  {n_done}/{total} documents "
-                  f"({n_passages} passages)…", file=sys.stderr)
+                  f"({n_passages} passages, {len(skipped)} skipped)…", file=sys.stderr)
 
     try:
         if jobs == 1 or total <= 1:
@@ -613,6 +628,14 @@ def build_index(root: Path, db_path: Path, jsonl: Optional[Path] = None,
     conn.close()
     print(f"indexed {n_passages} passages from {n_docs} documents "
           f"using {jobs} job(s) -> {db_path}" + (f" (+ {jsonl})" if jsonl else ""))
+    if skipped:
+        report = db_path.with_suffix(".skipped.tsv")
+        with report.open("w", encoding="utf-8") as fh:
+            fh.write("file\treason\n")
+            for rel, reason in skipped:
+                fh.write(f"{rel}\t{reason}\n")
+        print(f"skipped {len(skipped)} document(s) with citation issues "
+              f"-> {report}", file=sys.stderr)
     return 0
 
 
