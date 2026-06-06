@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Cloned corpus texts (fetched by `make install`)
+/corpus/
+
+# Generated search index (whole dir is build output)
+/var/

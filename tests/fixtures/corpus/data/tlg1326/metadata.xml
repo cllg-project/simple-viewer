@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <collection identifier="urn:cts:greekLit:tlg1326">
+        <title>Dionysius Epic.</title>
+        <members>
+            <collection identifier="urn:cts:greekLit:tlg1326.tlg001">
+            <title>Fragmenta</title>
+            <dublinCore>
+                <creator xmlns="http://purl.org/dc/terms/">Dionysius Epic.</creator>
+            </dublinCore>
+            <members>
+                <resource identifier="urn:cts:greekLit:tlg1326.tlg001.cllg-grc1" filepath="./tlg001/tlg1326.tlg001.cllg-grc1.xml">
+                    <title>Fragmenta</title>
+                    <description>Dionysius Epic. (c. a. A.D. 3), Fragmenta (1326: 001) "Die griechischen Dichterfragmente der römischen Kaiserzeit, vol. 1, 2nd edn.", Ed. Heitsch, E. Göttingen: Vandenhoeck : Ruprecht, 1963.</description>
+                    <parent>urn:cts:greekLit:tlg1326.tlg001</parent>
+                </resource>
+            </members>
+        </collection>
+        </members>
+    </collection>

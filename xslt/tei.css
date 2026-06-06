@@ -1,0 +1,177 @@
+/* ===========================================================================
+   tei.css - styling for the HTML produced by xslt/tei-to-html.xsl
+
+   Every rule below documents which TEI element/attribute generated the class it
+   targets. The HTML is a *fragment* (no <html>/<body>); host it inside a page
+   whose container carries the .tei-text class (browse.py does this).
+
+   Class index (class  <-  TEI source):
+     .tei-div        <-  <div>            (data-type/-subtype/-n carry @type/@subtype/@n)
+     .tei-ref-n      <-  @n of a <div> that has no <head> (visible citation tag)
+     .tei-head       <-  <head>           (rendered as <h2>..<h6> by nesting depth)
+     .tei-head-label <-  <label type="head">
+     .tei-label      <-  <label>          (other types)
+     .tei-p          <-  <p>
+     .tei-ab         <-  <ab>
+     .tei-lg         <-  <lg>             (verse group)
+     .tei-l          <-  <l>              (verse line, data-n = @n)
+     .tei-lineno     <-  @n of an <l>     (line-number gutter)
+     .tei-l-text     <-  text run of an <l>
+     .tei-sp         <-  <sp>             (speech)
+     .tei-speaker    <-  <speaker>
+     .tei-list/.tei-item  <-  <list>/<item>
+     .tei-figure/.tei-graphic/.tei-figdesc  <-  <figure>/<graphic>/<figDesc>
+     .tei-hi         <-  <hi>             (also rendered as <em>/<strong>/<sup>/<sub>)
+     .tei-rend-*     <-  <hi> with an unmapped @rend value (e.g. tei-rend-smallcaps)
+     .tei-choice     <-  <choice>         (shows reading text; variant in @title)
+     .tei-corr/.tei-expan/.tei-reg        <-  bare reading-side apparatus
+     .tei-sic/.tei-abbr/.tei-orig         <-  bare non-reading apparatus
+     .tei-foreign    <-  <foreign>        (lang = @xml:lang)
+     .tei-gap        <-  <gap>            (shows "[…]"; @reason/@extent in @title)
+     .tei-supplied   <-  <supplied>       (wrapped in ⟨ ⟩)
+     .tei-unclear    <-  <unclear>
+     .tei-add/.tei-del  <-  <add>/<del>   (also <ins>/<del>)
+     .tei-seg        <-  <seg>
+     .tei-w          <-  <w>
+     .tei-g          <-  <g>              (glyph)
+     .tei-quote/.tei-q/.tei-cit  <-  <quote>/<q>/<cit>
+     .tei-bibl       <-  <bibl>
+     .tei-ref        <-  <ref>            (<a> when @target present)
+     .tei-note       <-  <note>           (folded to a hoverable marker)
+     .tei-note-body  <-  the note content (revealed on hover)
+     .tei-pb/.tei-cb/.tei-lb/.tei-milestone  <-  <pb>/<cb>/<lb>/<milestone>
+     .tei-space      <-  <space>          (@quantity non-breaking spaces)
+     .tei-persName/.tei-placeName/.tei-name/.tei-date/...  <-  named entities
+     .tei            <-  CATCH-ALL: any element the stylesheet did not name
+                         explicitly (also gets .tei-<localname>); keeps unknown
+                         markup visible instead of dropping it.
+   ========================================================================== */
+
+.tei-text {
+  font-family: "Gentium Plus", "Brill", Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #1a1a1a;
+  max-width: 46rem;
+}
+
+/* --- Divisions ------------------------------------------------------------ */
+/* <div>: a citeable structural unit (fragment, page, chapter, ...). */
+.tei-div { margin: 0 0 1.5rem; }
+/* @n of a head-less <div>: a small grey citation tag in the left margin. */
+.tei-ref-n {
+  display: inline-block;
+  min-width: 2.2rem;
+  margin-right: .6rem;
+  color: #8a6d3b;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Headings ------------------------------------------------------------- */
+.tei-head { font-weight: 600; line-height: 1.3; margin: 1.2rem 0 .6rem; }
+/* <label type="head">: an inline running header, not a section title. */
+.tei-head-label { display: block; font-weight: 600; margin: .4rem 0; }
+.tei-label { color: #555; }
+
+/* --- Prose ---------------------------------------------------------------- */
+.tei-p  { margin: 0 0 .8rem; text-align: justify; }
+.tei-ab { margin: 0 0 .8rem; }
+
+/* --- Verse ---------------------------------------------------------------- */
+.tei-lg { margin: 0 0 1rem; }
+/* <l>: each line on its own row, with a line-number gutter. */
+.tei-l { display: flex; gap: .8rem; align-items: baseline; }
+.tei-lineno {
+  flex: 0 0 2.2rem;
+  text-align: right;
+  color: #aaa;
+  font-size: .8em;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.tei-l-text { white-space: pre-wrap; }
+
+/* --- Speech & lists ------------------------------------------------------- */
+.tei-sp { margin: 0 0 .8rem; }
+.tei-speaker { font-weight: 600; margin-right: .4rem; }
+.tei-list { margin: 0 0 .8rem 1.2rem; }
+.tei-item { margin: .1rem 0; }
+
+/* --- Figures -------------------------------------------------------------- */
+.tei-figure { margin: 1rem 0; text-align: center; }
+.tei-graphic { max-width: 100%; height: auto; }
+.tei-figdesc { font-size: .9em; color: #666; }
+
+/* --- Highlight / rend ----------------------------------------------------- */
+.tei-hi { } /* base; semantic <em>/<strong>/<sup>/<sub> cover the common cases */
+.tei-rend-smallcaps { font-variant: small-caps; }
+.tei-rend-underline { text-decoration: underline; }
+.tei-rend-spaced    { letter-spacing: .15em; }
+.tei-rend-overline  { text-decoration: overline; }
+
+/* --- Editorial apparatus -------------------------------------------------- */
+/* <choice>: reading text shown; hover (via @title) reveals the source variant. */
+.tei-choice { border-bottom: 1px dotted #bbb; cursor: help; }
+.tei-corr, .tei-reg, .tei-expan { }
+.tei-sic, .tei-orig, .tei-abbr { color: #999; }
+.tei-foreign { font-style: italic; }
+.tei-gap { color: #b00; }
+.tei-supplied { color: #06c; }                 /* editor-supplied text in ⟨ ⟩ */
+.tei-unclear { opacity: .7; }
+.tei-add { text-decoration: none; color: #060; }
+.tei-del { color: #999; }
+
+/* --- Phrase-level --------------------------------------------------------- */
+.tei-seg { }
+.tei-w { }
+.tei-quote, .tei-q { font-style: italic; }
+.tei-bibl { font-variant: small-caps; }
+.tei-ref { color: #06c; text-decoration: none; }
+.tei-ref:hover { text-decoration: underline; }
+.tei-persName, .tei-placeName, .tei-name { font-variant: small-caps; }
+.tei-date { color: #555; }
+
+/* --- Notes ---------------------------------------------------------------- */
+/* <note> is folded to a small superscript marker; the body shows on hover. */
+.tei-note { position: relative; }
+.tei-note::before {
+  content: "*";
+  vertical-align: super;
+  font-size: .7em;
+  color: #b00;
+  cursor: pointer;
+}
+.tei-note .tei-note-body { display: none; }
+.tei-note:hover .tei-note-body {
+  display: block;
+  position: absolute;
+  left: 0; top: 1.2em;
+  z-index: 10;
+  width: 22rem;
+  padding: .5rem .7rem;
+  background: #fffbe6;
+  border: 1px solid #e0d28a;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  font-size: .85rem;
+  line-height: 1.4;
+}
+
+/* --- Milestones ----------------------------------------------------------- */
+/* Page/column breaks rendered as small inline markers; line breaks as <br>. */
+.tei-pb::before { content: "❡"; color: #c00aa0; margin: 0 .25em; font-size: .8em; }
+.tei-pb[data-n]::after {
+  content: " p." attr(data-n) " ";
+  color: #b388c9; font-size: .7em; vertical-align: super;
+}
+.tei-cb::before { content: "|"; color: #c00aa0; margin: 0 .25em; }
+.tei-milestone[data-n]::before {
+  content: "[" attr(data-unit) " " attr(data-n) "]";
+  color: #999; font-size: .75em; margin: 0 .2em;
+}
+.tei-space { white-space: pre; }
+
+/* --- Catch-all ------------------------------------------------------------ */
+/* Unknown elements stay visible (no special styling) so nothing is lost. */
+.tei { }
