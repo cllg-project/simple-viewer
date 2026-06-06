@@ -4,7 +4,7 @@ WSGI entrypoint for production servers (gunicorn, uWSGI, ...).
     gunicorn wsgi:app -b 0.0.0.0:8000 -w 2
 
 Configuration is taken from environment variables (with sensible defaults from
-browse.py):
+cllg_viewer):
 
     CLLG_ROOT       corpus data directory   (default ./corpus/data)
     CLLG_DB         FTS5 index path         (default ./var/search.sqlite)
@@ -17,7 +17,7 @@ gunicorn with --preload.
 """
 import os
 
-from browse import DEFAULT_DB, DEFAULT_DTS_BASE, DEFAULT_ROOT, create_app
+from cllg_viewer import DEFAULT_DB, DEFAULT_DTS_BASE, DEFAULT_ROOT, create_app
 
 
 def _flag(name: str) -> bool:

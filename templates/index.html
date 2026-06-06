@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{% if scope == 'text' %}Search inside texts{% else %}Browse the corpus{% endif %} · CLLG Light{% endblock %}
+{% block header_meta %}{{ total }} works under <code>{{ root }}</code>{% endblock %}
+{% block content %}
+<div class="page">
+  <form class="search" action="/" method="get" style="position:sticky;top:56px;z-index:30">
+    <div class="wrap">
+      <div class="search-inner">
+        <div class="search-row">
+          <div class="segmented" role="radiogroup" aria-label="Search scope">
+            <label>
+              <input type="radio" name="scope" value="meta" {% if scope != 'text' %}checked{% endif %}>
+              Works <span class="lbl-sub">author / title</span>
+            </label>
+            <label{% if not fts_on %} title="full-text is off — run: make index"{% endif %}>
+              <input type="radio" name="scope" value="text"
+                {% if scope == 'text' %}checked{% endif %}{% if not fts_on %} disabled{% endif %}>
+              Inside texts <span class="lbl-sub">{% if fts_on %}content{% else %}no index{% endif %}</span>
+            </label>
+          </div>
+
+          <div class="search-field">
+            <svg class="glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="search-input" type="search" name="q" value="{{ q }}" spellcheck="false"
+                   autocomplete="off" autofocus
+                   placeholder="{% if scope == 'text' %}search inside texts…{% else %}filter authors & works…{% endif %}">
+            <span class="kbd-hint">↵</span>
+          </div>
+
+          <label class="beta-toggle" title="Type Latin letters, get Greek">
+            <input type="checkbox" id="beta-toggle" name="beta" value="1" {% if beta %}checked{% endif %}>
+            <span class="greek" lang="grc">βῆτα</span> code
+          </label>
+
+          <button class="btn" type="submit">Search</button>
+        </div>
+
+        <div class="beta-hint" id="hint-bar" role="note" {% if not beta %}hidden{% endif %}>
+          <div class="beta-legend">
+            <span><b>)</b> <span class="g" lang="grc">ἀ</span> smooth</span>
+            <span><b>(</b> <span class="g" lang="grc">ἁ</span> rough</span>
+            <span><b>/</b> <span class="g" lang="grc">ά</span> acute</span>
+            <span><b>\</b> <span class="g" lang="grc">ὰ</span> grave</span>
+            <span><b>=</b> <span class="g" lang="grc">ᾶ</span> circumflex</span>
+            <span><b>|</b> <span class="g" lang="grc">ᾳ</span> iota sub.</span>
+            <span><b>+</b> <span class="g" lang="grc">ϊ</span> diaeresis</span>
+            <span><b>h q c y w</b> <span class="g" lang="grc">η θ ξ ψ ω</span> letters</span>
+          </div>
+          <div class="beta-preview">
+            <span class="from" id="beta-from"></span>
+            <span class="arrow">→</span>
+            <span class="to" lang="grc" id="beta-to"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="wrap">
+    <div class="home-head">
+      <h1>{% if scope == 'text' %}Search inside texts{% else %}Browse the corpus{% endif %}</h1>
+      <div class="count">
+        {% if scope == 'text' %}
+          <span>full-text index · <b>{{ total }}</b> works</span>
+        {% else %}
+          <span><b>{{ authors_shown }}</b> authors{{ ' matched' if q else ' shown' }} ·
+            <b>{{ total }}</b> works under root</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    {% if scope == 'text' %}
+      {% if hits %}
+        <div class="hits">
+          {% for h in hits %}
+            <a class="hit" href="/passage?file={{ h.file|urlencode }}&ref={{ h.ref|urlencode }}&tree={{ h.tree }}">
+              <div class="hit-where">
+                <span class="hit-author">{{ h.author }}</span>
+                <span class="hit-work" lang="la">{{ h.title or h.file }}</span>
+                <span class="hit-ref">§ {{ h.ref }}</span>
+              </div>
+              <div class="snip" lang="grc">{{ h.snippet|safe }}</div>
+            </a>
+          {% endfor %}
+        </div>
+        <div class="result-meta">
+          <span>{{ hits|length }} passage matches for <b lang="grc">{{ q_greek }}</b> ·
+            <kbd>↵</kbd> to open</span>
+          <span>indexed corpus</span>
+        </div>
+      {% elif q %}
+        <div class="empty-state">
+          <div class="glyph" lang="grc">—</div>
+          <h3>No passages found</h3>
+          <p>No occurrences of <b lang="grc">{{ q_greek }}</b> in the indexed corpus.
+             Check spelling, or try a shorter stem.</p>
+          <div class="hints">
+            <span>Tip: enable <b lang="grc">βῆτα</b> code to type Greek, e.g. <code>au)qa/deia</code>.</span>
+            <span>Tip: switch to <b>Works</b> to browse by author and title instead.</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <div class="glyph" lang="grc">Ϙ</div>
+          <h3>Search the full text</h3>
+          <p>Type a Greek word or stem to find every passage where it occurs,
+             with highlighted snippets you can open in the reader.</p>
+          <div class="hints">
+            <span>Enable <b lang="grc">βῆτα</b> code and type <code>au)qa/deias</code>.</span>
+            <span>Press <code>/</code> anywhere to focus the search field.</span>
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      {% if groups %}
+        <div class="catalogue-body">
+          <div class="catalogue">
+            {% set ns = namespace(last='') %}
+            {% for author, g in groups.items() %}
+              {% if g.letter != ns.last %}
+                {% set ns.last = g.letter %}
+                <div class="alpha-divider" id="alpha-{{ g.letter }}">{{ g.letter }}</div>
+              {% endif %}
+              <details class="author"{% if q and loop.first %} open{% endif %}>
+                <summary>
+                  <span class="twirl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                    stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+                  <span class="au-name">{{ author }}</span>
+                  <span class="au-count"><span class="pill">{{ g.works|length }}</span></span>
+                </summary>
+                <ul class="works">
+                  {% for w in g.works %}
+                    <li>
+                      <a href="/doc?file={{ w.file|urlencode }}" lang="la">{{ w.title or w.work_id }}</a>
+                      <span class="urn">{{ w.work_id }}</span>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endfor %}
+          </div>
+          <nav class="alpha-rail" aria-label="Jump to letter">
+            {% for L in alpha %}
+              {% if L in present %}<a href="#alpha-{{ L }}">{{ L }}</a>
+              {% else %}<a class="empty" aria-disabled="true">{{ L }}</a>{% endif %}
+            {% endfor %}
+          </nav>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <div class="glyph">∅</div>
+          <h3>No works match that filter</h3>
+          <p>Try fewer letters, or clear the field to browse the full catalogue.</p>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='betacode.js') }}"></script>{% endblock %}

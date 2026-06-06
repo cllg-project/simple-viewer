@@ -1,0 +1,16 @@
+<nav class="pager">
+  {% if prev_ref %}
+  <a class="prev" rel="prev" href="/passage?file={{ file|urlencode }}&ref={{ prev_ref|urlencode }}&tree={{ tree }}">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    <div class="pg-meta"><span class="pg-dir">‹ Prev</span><span class="pg-ref">{{ prev_ref }}</span></div>
+  </a>
+  {% else %}<span class="disabled prev">start of work</span>{% endif %}
+  {% if next_ref %}
+  <a class="next" rel="next" href="/passage?file={{ file|urlencode }}&ref={{ next_ref|urlencode }}&tree={{ tree }}">
+    <div class="pg-meta"><span class="pg-dir">Next ›</span><span class="pg-ref">{{ next_ref }}</span></div>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </a>
+  {% else %}<span class="disabled next">end of work</span>{% endif %}
+</nav>

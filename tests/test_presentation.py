@@ -15,7 +15,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import browse  # noqa: E402
+# The implementation now lives in the `cllg_viewer` package; the `browse` alias
+# keeps every call site below unchanged.
+import cllg_viewer as browse  # noqa: E402
 
 TEI = "http://www.tei-c.org/ns/1.0"
 # Self-contained fixture corpus (one small work) so the suite runs anywhere,
@@ -183,7 +185,9 @@ class TestCatalogCache:
             calls["n"] += 1
             return real(path)
 
-        monkeypatch.setattr(browse, "read_meta", counting)
+        # web.create_app imports read_meta into its own module namespace, so patch
+        # it there (browse is the cllg_viewer package; browse.web is the submodule).
+        monkeypatch.setattr(browse.web, "read_meta", counting)
         app = browse.create_app(Path(DATA).resolve())
         app.testing = True
         client = app.test_client()
@@ -230,6 +234,62 @@ class TestParallelIndex:
         assert rows1 and rows1 == rows2
 
 
+# A minimal TEI whose *nested* citeStructure accumulates a unit name with a hyphen
+# ("chapter__column-or-fragment"), which dapytains feeds into a regex group name
+# -> re.match raises PatternError inside get_reffs (it resolves the parent's xpath
+# for the nested level).  Such files must be skipped and reported, never crash the
+# run.  (Reproduces the real tlg0300/tlg0294 failures.)
+_BROKEN_TEI = """<?xml version="1.0" encoding="utf-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader><fileDesc>
+    <titleStmt><title>Broken</title><author>Anon</author></titleStmt>
+    <publicationStmt><p>p</p></publicationStmt><sourceDesc><p>s</p></sourceDesc>
+  </fileDesc><encodingDesc><refsDecl>
+    <citeStructure match="/TEI/text/body/div" use="@n" unit="chapter">
+      <citeStructure match="div" use="@n" unit="column-or-fragment"/>
+    </citeStructure>
+  </refsDecl></encodingDesc></teiHeader>
+  <text><body>
+    <div n="1"><div n="1"><l n="1">x</l></div></div>
+  </body></text>
+</TEI>"""
+
+
+class TestResilientIndex:
+    """A document dapytains cannot navigate is skipped, not fatal."""
+
+    def test_broken_doc_skipped_others_indexed(self, tmp_path):
+        import shutil
+        import sqlite3
+        from pathlib import Path
+        root = tmp_path / "data"
+        good = root / "good0001" / "w001"
+        good.mkdir(parents=True)
+        shutil.copy(Path(DATA, SAMPLE), good / "good0001.w001.cllg-grc1.xml")
+        bad = root / "bad0001" / "w001"
+        bad.mkdir(parents=True)
+        (bad / "bad0001.w001.cllg-grc1.xml").write_text(_BROKEN_TEI, encoding="utf-8")
+
+        db = tmp_path / "search.sqlite"
+        assert browse.build_index(root, db, jobs=2) == 0  # must not raise/hang
+
+        files = {f for (f,) in sqlite3.connect(db).execute(
+            "SELECT DISTINCT file FROM passages")}
+        assert any("good0001" in f for f in files)      # good doc indexed
+        assert not any("bad0001" in f for f in files)   # broken doc absent
+
+        report = db.with_suffix(".skipped.tsv")
+        assert report.is_file()
+        assert "bad0001" in report.read_text(encoding="utf-8")
+
+    def test_worker_returns_error_not_raises(self, tmp_path):
+        p = tmp_path / "bad.cllg-grc1.xml"
+        p.write_text(_BROKEN_TEI, encoding="utf-8")
+        browse._worker_init()
+        rel, error, rows = browse._index_document(("bad.cllg-grc1.xml", str(p)))
+        assert error is not None and rows == []
+
+
 class TestNavigationSearch:
     """Always-on: search authors/works to navigate (no index required)."""
 
@@ -256,6 +316,11 @@ class TestNavigationSearch:
         r = client.get("/?q=" + urllib.parse.quote("Βασσαρικά"))
         assert b"passage matches" not in r.data
 
+    def test_text_scope_disabled_without_index(self, client):
+        # The "Inside texts" radio is present but disabled when full-text is off.
+        body = client.get("/").get_data(as_text=True)
+        assert 'value="text"' in body and "disabled" in body
+
 
 class TestOptionalFullText:
     """Opt-in full-text search engine (SQLite FTS5), enabled with enable_fts."""
@@ -276,18 +341,63 @@ class TestOptionalFullText:
 
     def test_fulltext_search_greek(self, client):
         # Greek search is accent-sensitive (SQLite folds Latin, not Greek).
-        r = client.get("/?q=" + urllib.parse.quote("Βασσαρικά"))
+        # Full-text now lives behind the "Inside texts" field (scope=text).
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
         body = r.get_data(as_text=True)
         assert "passage matches" in body
         assert "<mark>" in body
 
+    def test_meta_scope_does_not_run_fulltext(self, client):
+        # The default "Works" field never runs the content engine.
+        body = client.get("/?q=" + urllib.parse.quote("Βασσαρικά")).get_data(as_text=True)
+        assert "passage matches" not in body
+
+    def test_betacode_input_searches_greek(self, client):
+        # Beta Code with the beta flag is converted server-side: Bassarika/
+        # "*bassarika/" -> Βασσαρικά, which then matches the indexed text.
+        r = client.get("/?scope=text&beta=1&q=" + urllib.parse.quote("*bassarika/"))
+        body = r.get_data(as_text=True)
+        assert "passage matches" in body
+        assert "Βασσαρικά" in body          # the converted query is echoed back
+
     def test_fulltext_off_when_not_enabled(self, fts_db):
-        # Same built index, but enable_fts=False -> no content hits.
+        # Same built index, but enable_fts=False -> text scope falls back to meta.
         root, db = fts_db
         app = browse.create_app(root, db_path=db, enable_fts=False)
         app.testing = True
-        r = app.test_client().get("/?q=" + urllib.parse.quote("Βασσαρικά"))
+        r = app.test_client().get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
         assert b"passage matches" not in r.data
+
+
+class TestBetacode:
+    """Beta Code -> Unicode Greek conversion (cllg_viewer.betacode.to_greek)."""
+
+    def test_lowercase_with_accents(self):
+        assert browse.to_greek("lo/gos") == "λόγος"
+        assert browse.to_greek("mh=nin") == "μῆνιν"
+
+    def test_breathings_and_uppercase(self):
+        assert browse.to_greek("a)/nqrwpos") == "ἄνθρωπος"
+        assert browse.to_greek("*)/anqrwpos") == "Ἄνθρωπος"  # diacritics after '*'
+        assert browse.to_greek("r(o/dos") == "ῥόδος"
+
+    def test_final_sigma(self):
+        assert browse.to_greek("qeo/s") == "θεός"           # word-final -> ς
+        assert browse.to_greek("ko/smos") == "κόσμος"
+
+    def test_iota_subscript_and_diaeresis(self):
+        assert browse.to_greek("a|") == "ᾳ"
+        assert browse.to_greek("i+") == "ϊ"
+
+    def test_non_letters_pass_through(self):
+        # Spaces are preserved (word boundaries survive), so multi-word search works.
+        assert browse.to_greek("lo/gos kai\\ qeo/s") == "λόγος καὶ θεός"
+
+    def test_idempotent_on_greek(self):
+        # Already-Greek text is untouched, so converting twice is safe (the server
+        # converts even when the JS field already produced Greek).
+        assert browse.to_greek("λόγος") == "λόγος"
+        assert browse.to_greek(browse.to_greek("lo/gos")) == "λόγος"
 
 
 class TestDtsLink:

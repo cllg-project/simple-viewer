@@ -86,8 +86,10 @@ The CLI flags `--root`, `--db`, `--dts-base`, `--fulltext` override these.
    HTML fragment  ──►  Flask  ──►  browser
 ```
 
-- `browse.py` — the Flask app + the `serve` / `index` CLI.
-- `wsgi.py` — gunicorn entrypoint (`gunicorn wsgi:app`).
+- `cllg_viewer/` — the package: `rendering` (Saxon), `corpus` (discovery/DTS),
+  `search` (FTS5 + parallel index), `web` (Flask app), `cli` (argparse).
+- `browse.py` / `wsgi.py` — thin entry points (`serve` / `index` CLI; `gunicorn wsgi:app`).
+- `templates/` + `static/app.css` — the UI chrome (Jinja templates + page styles).
 - `xslt/tei-to-html.xsl` — TEI → HTML presentation transform.
 - `xslt/tei-to-text.xsl` — TEI → plain text (notes dropped) for indexing.
 - `xslt/tei.css` — styles; every class documents its TEI source.

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CLLG Light · DTS Viewer{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f3b4c'/%3E%3Cg fill='%23f4efe4' font-family='Georgia,serif' font-weight='700' font-size='11' text-anchor='middle'%3E%3Ctext x='10' y='15'%3EC%3C/text%3E%3Ctext x='22' y='15'%3EL%3C/text%3E%3Ctext x='10' y='27'%3EL%3C/text%3E%3Ctext x='22' y='27'%3EG%3C/text%3E%3C/g%3E%3Cpath d='M16 4v24M4 16h24' stroke='%23f4efe4' stroke-opacity='.28' stroke-width='1'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=GFS+Neohellenic:wght@400;700&family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Gentium+Plus:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="/tei.css">
+<script>
+/* Apply a stored theme before first paint to avoid a flash. */
+(function () {
+  try {
+    var t = localStorage.getItem("cllg-theme");
+    if (t && t !== "auto") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {}
+})();
+</script>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="app">
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="CLLG Light — home">
+      <div class="monogram" aria-hidden="true">
+        <span class="r1">C</span><span class="r1">L</span>
+        <span class="r2">L</span><span class="r2">G</span>
+      </div>
+      <span class="brand-text">
+        <span class="brand-name"><b>CLLG</b> <span class="lite">Light</span></span>
+        <span class="brand-sub">DTS Viewer</span>
+      </span>
+    </a>
+    <div class="header-spacer"></div>
+    <div class="header-meta">{% block header_meta %}{% endblock %}</div>
+    <div class="header-actions">
+      <button class="icon-btn" id="theme-toggle" title="Theme" aria-label="Toggle theme"></button>
+    </div>
+  </header>
+  {% block breadcrumbs %}{% endblock %}
+  {% block content %}{% endblock %}
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

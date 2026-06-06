@@ -1,0 +1,19 @@
+{% extends "_reader.html" %}
+{% block title %}{{ ref }} · {{ meta.title }}{% endblock %}
+{% block header_meta %}<code>{{ urn or file }}</code>{% endblock %}
+{% block reader_main %}
+<div class="read-toolbar">
+  <button class="icon-btn rail-toggle" id="rail-toggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v14a2 2 0 0 0 2 2h3M5 9h5M10 9V4"/><circle cx="4.5" cy="4" r="1.5"/></svg>
+  </button>
+  {% if urn %}<span class="urn">{{ urn }}</span>{% endif %}
+  <a class="dts-link" href="/passage?file={{ file|urlencode }}{% if current %}&ref={{ current|urlencode }}{% endif %}&tree={{ tree }}&format=text">plain text</a>
+  {% if dts_url %}<a class="dts-link" href="{{ dts_url }}">DTS API ↗</a>{% endif %}
+  <span class="spacer"></span>
+  <span style="font-family:var(--serif);font-weight:700;font-size:15px">{{ ref }}</span>
+</div>
+{% include "_pager.html" %}
+<div class="tei-text" lang="grc">{{ body }}</div>
+{% include "_pager.html" %}
+{% endblock %}

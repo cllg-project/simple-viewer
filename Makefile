@@ -4,6 +4,7 @@
 #   make run       serve with gunicorn (production)
 #   make dev       serve with the Flask dev server
 #   make index     build the optional full-text search index
+#   make search    build the index AND serve with full-text search enabled
 #   make test      run the test suite
 #   make clean     remove the venv, the index and the cloned corpus
 
@@ -22,10 +23,10 @@ DB          ?= var/search.sqlite
 export CLLG_ROOT := $(CURDIR)/$(CORPUS_DIR)/data
 export CLLG_DB   := $(CURDIR)/$(DB)
 
-.PHONY: install venv deps corpus run dev index test clean help
+.PHONY: install venv deps corpus run dev index search test clean help
 
 help:
-	@sed -n '3,9p' $(MAKEFILE_LIST)
+	@sed -n '3,10p' $(MAKEFILE_LIST)
 
 ## install: venv + dependencies + corpus clone
 install: venv deps corpus
@@ -58,6 +59,12 @@ dev:
 ## index: build the optional SQLite FTS5 full-text search engine (parallel)
 index:
 	$(PY) browse.py index --root "$(CLLG_ROOT)" --db "$(DB)" $(if $(JOBS),--jobs $(JOBS),)
+
+## search: build the index (if needed) then serve with full-text search enabled
+search:
+	@test -f "$(DB)" || $(MAKE) index
+	$(PY) browse.py serve --root "$(CLLG_ROOT)" --host $(HOST) --port $(PORT) \
+		--fulltext --db "$(DB)"
 
 ## test: run the test suite (uses the embedded fixture corpus, no clone needed)
 test:
