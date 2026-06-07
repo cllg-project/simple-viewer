@@ -23,8 +23,10 @@ from .rendering import ROOT_DIR
 # Override with the CLLG_ROOT / CLLG_DB env vars or the --root / --db flags.
 DEFAULT_ROOT = Path(os.environ.get("CLLG_ROOT", str(ROOT_DIR / "corpus" / "data")))
 DEFAULT_DB = Path(os.environ.get("CLLG_DB", str(ROOT_DIR / "var" / "search.sqlite")))
-# A running dapytains/DTS server the reading page can deep-link into.
-DEFAULT_DTS_BASE = os.environ.get("CLLG_DTS_BASE", "http://localhost:8000")
+# A running dapytains/DTS server the reading page can deep-link into.  Empty by
+# default: the viewer is NOT a DTS server, so the "DTS API ↗" deep-link is only
+# shown when CLLG_DTS_BASE (or --dts-base) points at a real DTS endpoint.
+DEFAULT_DTS_BASE = os.environ.get("CLLG_DTS_BASE", "")
 
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 # Files served as editions: CapiTainS naming ends with -<lang><n>.xml

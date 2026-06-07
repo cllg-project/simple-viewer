@@ -119,12 +119,24 @@ class TestBrowseApp:
     def test_index_lists_works(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        assert b"/doc?file=" in r.data
+        # URN is the primary identifier; the fixture work has one.
+        assert b"/doc?urn=" in r.data
 
     def test_doc_lists_passages(self, client):
+        # ?file= is still accepted as a fallback for addressing the work...
         r = client.get("/doc?file=" + urllib.parse.quote(SAMPLE))
         assert r.status_code == 200
-        assert b"/passage?file=" in r.data
+        # ...but the links it emits are URN-keyed.
+        assert b"/passage?urn=" in r.data
+
+    def test_doc_addressable_by_urn(self, client):
+        from cllg_viewer.corpus import dts_identifier
+        from pathlib import Path
+        urn = dts_identifier(Path(DATA, SAMPLE))
+        assert urn
+        r = client.get("/doc?urn=" + urllib.parse.quote(urn))
+        assert r.status_code == 200
+        assert b"/passage?urn=" in r.data
 
     def test_passage_html(self, client):
         r = client.get("/passage?file=" + urllib.parse.quote(SAMPLE) + "&ref=4")
@@ -344,20 +356,20 @@ class TestOptionalFullText:
         # Full-text now lives behind the "Inside texts" field (scope=text).
         r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
         body = r.get_data(as_text=True)
-        assert "passage matches" in body
+        assert "result-meta--top" in body   # results header rendered
         assert "<mark>" in body
 
     def test_meta_scope_does_not_run_fulltext(self, client):
         # The default "Works" field never runs the content engine.
         body = client.get("/?q=" + urllib.parse.quote("Βασσαρικά")).get_data(as_text=True)
-        assert "passage matches" not in body
+        assert "result-meta--top" not in body
 
     def test_betacode_input_searches_greek(self, client):
         # Beta Code with the beta flag is converted server-side: Bassarika/
         # "*bassarika/" -> Βασσαρικά, which then matches the indexed text.
         r = client.get("/?scope=text&beta=1&q=" + urllib.parse.quote("*bassarika/"))
         body = r.get_data(as_text=True)
-        assert "passage matches" in body
+        assert "result-meta--top" in body
         assert "Βασσαρικά" in body          # the converted query is echoed back
 
     def test_fulltext_off_when_not_enabled(self, fts_db):
@@ -366,7 +378,79 @@ class TestOptionalFullText:
         app = browse.create_app(root, db_path=db, enable_fts=False)
         app.testing = True
         r = app.test_client().get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
-        assert b"passage matches" not in r.data
+        assert b"result-meta--top" not in r.data
+
+    def test_wildcard_prefix(self, client):
+        # A trailing '*' is a prefix wildcard: Βασσαρικ* matches Βασσαρικά.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικ*"))
+        body = r.get_data(as_text=True)
+        assert "result-meta--top" in body
+        assert "Βασσαρικά" in body          # the matched token, in the snippet
+
+    def test_case_insensitive(self, client):
+        # unicode61 case-folds: a lowercase query matches the capitalised token.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("βασσαρικά"))
+        assert "result-meta--top" in r.get_data(as_text=True)
+
+    def test_pagination(self, client):
+        # τ* matches many passages -> multiple pages, with a working pager.
+        p1 = client.get("/?scope=text&q=" + urllib.parse.quote("τ*")
+                        + "&page=1").get_data(as_text=True)
+        p2 = client.get("/?scope=text&q=" + urllib.parse.quote("τ*")
+                        + "&page=2").get_data(as_text=True)
+        assert "Page <b>1</b>" in p1                      # "Page 1 of N" status
+        assert 'class="pagination"' in p1                 # numbered controls
+        assert "&amp;page=2" in p1 or "&page=2" in p1     # a page link
+        assert "Showing <b>1–8</b>" in p1                 # 8 per page
+        assert p1 != p2                                   # different results per page
+
+    def test_pagination_clamps_overflow(self, client):
+        # A page past the end clamps to the last page rather than erroring/empty.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά")
+                       + "&page=999")
+        assert r.status_code == 200
+        assert "result-meta--top" in r.get_data(as_text=True)
+
+
+    def test_fts_excerpts(self, fts_db):
+        _, db = fts_db
+        conn = browse.fts_connect(db)
+        row = conn.execute(
+            "SELECT file, tree, ref FROM passages WHERE leaf='1' LIMIT 1").fetchone()
+        key = (row[0], row[1], row[2])
+        ex = browse.fts_excerpts(conn, [key], length=50)
+        conn.close()
+        assert key in ex and ex[key]                 # non-empty excerpt
+        assert len(ex[key]) <= 51                     # truncated (+ ellipsis) or short
+
+
+def test_fts_similarity_context_marks_shared():
+    import sqlite3
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        "CREATE VIRTUAL TABLE passages USING fts5(file UNINDEXED, tree UNINDEXED,"
+        " ref UNINDEXED, title, author, text, leaf UNINDEXED)")
+    conn.executemany(
+        "INSERT INTO passages(file,tree,ref,title,author,text,leaf)"
+        " VALUES (?,?,?,?,?,?,?)", [
+            ("f", "default", "1", "T", "A", "περὶ τῆς αὐθαδείας λόγος", "1"),
+            ("f", "default", "2", "T", "A", "ἄλλο τι περὶ αὐθαδείας", "1"),
+        ])
+    ctx = browse.fts_similarity_context(
+        conn, ("f", "default", "1"), [("f", "default", "2")])
+    c = ctx[("f", "default", "2")]
+    assert "<mark>" in c["snip"]                       # shared words highlighted
+    assert any("αὐθαδ" in w for w in c["shared"])      # and listed as chips
+    # short function words (τι, < 4 chars) are not treated as shared
+    assert "τι" not in c["shared"]
+
+
+def test_fts_query_string_wildcard_and_terms():
+    f = browse.fts_query_string
+    assert f("λογ*") == '"λογ"*'              # trailing * -> prefix
+    assert f("a b") == '"a" AND "b"'          # multi-term AND
+    assert f("Λόγος") == '"Λόγος"'            # plain quoted term
+    assert f("  ") == ""                       # empty -> empty (no MATCH)
 
 
 class TestBetacode:

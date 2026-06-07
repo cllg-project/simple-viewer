@@ -16,7 +16,7 @@
     {% if trees|length > 1 %}
     <div class="urn-line">
       <span class="lbl-sub">trees:</span>
-      {% for t in trees %}<a class="dts-link" href="/doc?file={{ file|urlencode }}&tree={{ t }}">{{ t }}</a>{% endfor %}
+      {% for t in trees %}<a class="dts-link" href="{{ doc_url(file, t) }}">{{ t }}</a>{% endfor %}
     </div>
     {% endif %}
     <div class="work-stats">
@@ -32,8 +32,8 @@
       {% endif %}
     </div>
     <div class="landing-cta">
-      {% if first_ref %}<a class="btn" href="/passage?file={{ file|urlencode }}&ref={{ first_ref|urlencode }}&tree={{ tree }}">Start reading ↓</a>{% endif %}
-      <a class="btn btn--ghost" href="/passage?file={{ file|urlencode }}&tree={{ tree }}">Read whole work</a>
+      {% if first_ref %}<a class="btn" href="{{ passage_url(file, first_ref, tree) }}">Start reading ↓</a>{% endif %}
+      <a class="btn btn--ghost" href="{{ passage_url(file, tree=tree) }}">Read whole work</a>
     </div>
   </div>
 </div>
@@ -43,7 +43,7 @@
 <div class="pager">
   <span class="disabled prev">opening of work</span>
   {% if next_ref %}
-  <a class="next" href="/passage?file={{ file|urlencode }}&ref={{ next_ref|urlencode }}&tree={{ tree }}">
+  <a class="next" href="{{ passage_url(file, next_ref, tree) }}">
     <div class="pg-meta"><span class="pg-dir">Next ›</span><span class="pg-ref">{{ next_ref }}</span></div>
   </a>
   {% endif %}

@@ -1,0 +1,10 @@
+# Build-only dependencies for the semantic "Similar passages" store.
+#
+# These are needed ONLY by `browse.py vectorize` (encoding passages with the ONNX
+# sentence-transformer).  Serving never imports them — a serve host needs only the
+# base requirements (which include sqliteai-vector).  Build the store anywhere,
+# then copy var/vectors/vectors.sqlite to the serve host.
+onnxruntime>=1.17     # runs the ONNX encoder model
+tokenizers>=0.15      # WordPiece tokenizer for the model
+huggingface_hub>=0.20 # downloads the model snapshot
+numpy>=1.24           # mean-pooling / L2-normalization during encoding

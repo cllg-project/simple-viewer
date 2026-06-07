@@ -74,9 +74,15 @@
   <div class="wrap">
     {% if scope == 'text' %}
       {% if hits %}
-        <div class="hits">
+        {% set base = '/?scope=text&q=' ~ (q|urlencode) ~ ('&beta=1' if beta else '') %}
+        <div class="result-meta result-meta--top">
+          <span>Showing <b>{{ first_hit }}–{{ last_hit }}</b> of <b>{{ total_hits }}</b> passages
+            for <b lang="grc">{{ q_greek }}</b></span>
+          <span class="rm-hint"><kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>↵</kbd> open</span>
+        </div>
+        <div class="hits" id="hits">
           {% for h in hits %}
-            <a class="hit" href="/passage?file={{ h.file|urlencode }}&ref={{ h.ref|urlencode }}&tree={{ h.tree }}">
+            <a class="hit{% if loop.first %} active{% endif %}" href="{{ passage_url(h.file, h.ref, h.tree) }}">
               <div class="hit-where">
                 <span class="hit-author">{{ h.author }}</span>
                 <span class="hit-work" lang="la">{{ h.title or h.file }}</span>
@@ -86,10 +92,38 @@
             </a>
           {% endfor %}
         </div>
-        <div class="result-meta">
-          <span>{{ hits|length }} passage matches for <b lang="grc">{{ q_greek }}</b> ·
-            <kbd>↵</kbd> to open</span>
-          <span>indexed corpus</span>
+        <div class="result-foot"
+             data-page="{{ page }}" data-pages="{{ pages }}" data-base="{{ base }}">
+          {% if pages > 1 %}
+          <nav class="pagination" aria-label="Result pages">
+            {% if page > 1 %}
+              <a class="pg-btn" aria-label="First page" href="{{ base }}&page=1"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6l-6 6 6 6M8 6v12"/></svg></a>
+              <a class="pg-btn" rel="prev" aria-label="Previous page" href="{{ base }}&page={{ page - 1 }}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></a>
+            {% else %}
+              <span class="pg-btn is-disabled" aria-disabled="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6l-6 6 6 6M8 6v12"/></svg></span>
+              <span class="pg-btn is-disabled" aria-disabled="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></span>
+            {% endif %}
+            <div class="pg-nums">
+              {% for p in page_win %}
+                {% if p is none %}
+                  <span class="pg-gap">…</span>
+                {% elif p == page %}
+                  <span class="pg-num is-current" aria-current="page">{{ p }}</span>
+                {% else %}
+                  <a class="pg-num" href="{{ base }}&page={{ p }}">{{ p }}</a>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% if page < pages %}
+              <a class="pg-btn" rel="next" aria-label="Next page" href="{{ base }}&page={{ page + 1 }}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+              <a class="pg-btn" aria-label="Last page" href="{{ base }}&page={{ pages }}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l6 6-6 6M16 6v12"/></svg></a>
+            {% else %}
+              <span class="pg-btn is-disabled" aria-disabled="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+              <span class="pg-btn is-disabled" aria-disabled="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l6 6-6 6M16 6v12"/></svg></span>
+            {% endif %}
+          </nav>
+          {% else %}<span></span>{% endif %}
+          <span class="pg-status">Page <b>{{ page }}</b> of <b>{{ pages }}</b></span>
         </div>
       {% elif q %}
         <div class="empty-state">
@@ -110,6 +144,7 @@
              with highlighted snippets you can open in the reader.</p>
           <div class="hints">
             <span>Enable <b lang="grc">βῆτα</b> code and type <code>au)qa/deias</code>.</span>
+            <span>Use a <code>*</code> for prefix search, e.g. <code lang="grc">λογ*</code>.</span>
             <span>Press <code>/</code> anywhere to focus the search field.</span>
           </div>
         </div>
@@ -135,7 +170,7 @@
                 <ul class="works">
                   {% for w in g.works %}
                     <li>
-                      <a href="/doc?file={{ w.file|urlencode }}" lang="la">{{ w.title or w.work_id }}</a>
+                      <a href="{{ doc_url(w.file) }}" lang="la">{{ w.title or w.work_id }}</a>
                       <span class="urn">{{ w.work_id }}</span>
                     </li>
                   {% endfor %}
@@ -161,4 +196,5 @@
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='betacode.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='betacode.js') }}"></script>
+{% if scope == 'text' %}<script src="{{ url_for('static', filename='search-nav.js') }}"></script>{% endif %}{% endblock %}

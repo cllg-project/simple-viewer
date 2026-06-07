@@ -6,7 +6,7 @@
   <a href="/?q={{ (meta.author or '')|urlencode }}">{{ meta.author or '—' }}</a>
   <span class="sep">›</span>
   {% if current %}
-    <a href="/doc?file={{ file|urlencode }}{% if tree %}&tree={{ tree }}{% endif %}" lang="la">{{ meta.title }}</a>
+    <a href="{{ doc_url(file, tree) }}" lang="la">{{ meta.title }}</a>
     <span class="sep">›</span>
     <span class="here">{{ current }}</span>
   {% else %}
@@ -37,7 +37,7 @@
         <a class="level-{{ r.level }}{% if r.current %} is-current{% endif %}"
            {% if r.current %}aria-current="true"{% endif %}
            data-text="{{ (r.ref ~ ' ' ~ r.citeType)|lower }}"
-           href="/passage?file={{ file|urlencode }}&ref={{ r.ref|urlencode }}&tree={{ tree }}">
+           href="{{ passage_url(file, r.ref, tree) }}">
           <span class="ref-n">{{ r.ref }}</span>
           <span class="ref-label">{{ r.citeType }}</span>
         </a>
