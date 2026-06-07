@@ -9,6 +9,7 @@
   </button>
   {% if urn %}<span class="urn">{{ urn }}</span>{% endif %}
   <a class="dts-link" href="{{ passage_url(file, current, tree, fmt='text') }}">plain text</a>
+  <a class="dts-link" href="{{ stats_url(file, tree, current) }}">statistics</a>
   {% if dts_url %}<a class="dts-link" href="{{ dts_url }}">DTS API ↗</a>{% endif %}
   <span class="spacer"></span>
   {% if vectors_on and current %}

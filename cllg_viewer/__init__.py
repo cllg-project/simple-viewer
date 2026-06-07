@@ -19,6 +19,7 @@ from .search import (DEFAULT_TIMEOUT, FTS_PAGE_SIZE, _index_document,
                      _index_document_leaves, _run_render_pool, _worker_init,
                      build_index, fts_connect, fts_count, fts_excerpts,
                      fts_query_string, fts_search, fts_similarity_context)
+from .stats import compute_work_stats
 from .vectors import (DEFAULT_TOPK, DEFAULT_VECTORS_DB, DEFAULT_VECTORS_DIR,
                       Encoder, VectorStore, build_vectors, ensure_model,
                       strip_accents_and_lowercase)
@@ -32,7 +33,7 @@ __all__ = [
     "fts_excerpts", "fts_similarity_context", "FTS_PAGE_SIZE",
     "_index_document", "_index_document_leaves", "_run_render_pool", "_worker_init",
     "VectorStore", "Encoder", "build_vectors", "ensure_model",
-    "strip_accents_and_lowercase",
+    "strip_accents_and_lowercase", "compute_work_stats",
     "DEFAULT_ROOT", "DEFAULT_DB", "DEFAULT_DTS_BASE", "DEFAULT_TIMEOUT",
     "DEFAULT_VECTORS_DIR", "DEFAULT_VECTORS_DB", "DEFAULT_TOPK",
     "ROOT_DIR", "HTML_XSLT", "TEXT_XSLT", "CSS_FILE",

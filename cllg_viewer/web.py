@@ -20,6 +20,7 @@ from .corpus import (DEFAULT_DB, DEFAULT_DTS_BASE, dts_document_url,
 from .rendering import CSS_FILE, ROOT_DIR, Renderer
 from .search import (FTS_PAGE_SIZE, fts_connect, fts_count, fts_excerpts,
                      fts_search, fts_similarity_context)
+from .stats import compute_work_stats
 from .vectors import DEFAULT_VECTORS_DB, VectorStore
 
 from dapytains.tei.document import Document
@@ -87,6 +88,9 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
     _catalog: List[dict] = []
     _urn_to_file: dict = {}
     _file_to_urn: dict = {}
+    # Whole-work token stats are expensive (render the entire work once) but static,
+    # so memoize per (file, tree) like the catalogue.
+    _stats_cache: dict = {}
 
     def all_works() -> List[dict]:
         if _catalog:
@@ -146,7 +150,19 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             params["tree"] = tree
         return "/doc?" + urlencode(params)
 
-    app.jinja_env.globals.update(passage_url=passage_url, doc_url=doc_url)
+    def stats_url(file=None, tree=None, ref=None, urn=None) -> str:
+        """Token-statistics URL; `ref` is carried so "Back to reading" can return
+        to the passage the reader came from."""
+        urn = urn or (urn_for(file) if file else None)
+        params = {"urn": urn} if urn else ({"file": file} if file else {})
+        if tree:
+            params["tree"] = tree
+        if ref:
+            params["ref"] = ref
+        return "/stats?" + urlencode(params)
+
+    app.jinja_env.globals.update(passage_url=passage_url, doc_url=doc_url,
+                                 stats_url=stats_url)
 
     def group_by_author(works: List[dict]) -> "OrderedDict":
         """Author -> [works], so the home page navigates Author > Work."""
@@ -339,6 +355,34 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             h["urn"] = urn_for(h["file"])
             h.setdefault("shared", [])
         return jsonify({"hits": hits})
+
+    @app.route("/stats")
+    def stats_view():
+        """Whole-work token statistics + frequency data-viz."""
+        rel = resolve_rel(request.args)
+        ref = request.args.get("ref") or None      # passage to return to
+        try:
+            path = safe_path(root, rel)
+        except (ValueError, FileNotFoundError):
+            abort(404)
+        document = Document(str(path))
+        tree_name = request.args.get("tree") or document.default_tree
+        meta = read_meta(path)
+        urn = dts_identifier(path)
+        lang = "la" if "-lat" in Path(rel).name else "grc"
+        key = (rel, tree_name)
+        stats = _stats_cache.get(key)
+        if stats is None:
+            try:
+                node = document.get_passage(ref_or_start=None, tree=tree_name)
+                text = renderer.render(node, "text")
+            except Exception as exc:  # noqa: BLE001 - unnavigable work
+                abort(404, description=str(exc))
+            stats = compute_work_stats(text, lang=lang)
+            _stats_cache[key] = stats
+        return render_template(
+            "stats.html", file=rel, urn=urn, tree=tree_name, meta=meta,
+            stats=stats, ref=ref, lang=lang)
 
     @app.route("/tei.css")
     def css():

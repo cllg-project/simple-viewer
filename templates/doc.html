@@ -34,6 +34,7 @@
     <div class="landing-cta">
       {% if first_ref %}<a class="btn" href="{{ passage_url(file, first_ref, tree) }}">Start reading ↓</a>{% endif %}
       <a class="btn btn--ghost" href="{{ passage_url(file, tree=tree) }}">Read whole work</a>
+      <a class="btn btn--ghost" href="{{ stats_url(file, tree) }}">Word statistics</a>
     </div>
   </div>
 </div>
