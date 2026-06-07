@@ -171,12 +171,16 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             key = w["author"] or w["author_id"]
             g = groups.setdefault(key, {"author": key, "id": w["author_id"], "works": []})
             g["works"].append(w)
-        # sort authors alphabetically, works by title within an author
-        ordered = OrderedDict(sorted(groups.items(), key=lambda kv: kv[0].lower()))
-        for name, g in ordered.items():
-            g["works"].sort(key=lambda w: (w["title"] or w["file"]).lower())
+        for name, g in groups.items():
             g["letter"] = _letter_of(name)
-        return ordered
+            g["works"].sort(key=lambda w: (w["title"] or w["file"]).lower())
+        # Order by (letter, name): the A–Z dividers must be monotonic and each
+        # letter unique, so the jump-rail anchors land in the right place.  Sorting
+        # by name alone breaks this — a bracketed pseudo-author like "[Valerius]"
+        # sorts to the front by '[' yet carries letter 'V' (see _letter_of), which
+        # would emit a stray, duplicate "V" divider near the top.
+        return OrderedDict(sorted(
+            groups.items(), key=lambda kv: (kv[1]["letter"], kv[0].lower())))
 
     # Optional full-text search is only on when explicitly enabled *and* built.
     fts_on = enable_fts and db_path.is_file()
@@ -383,6 +387,10 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
         return render_template(
             "stats.html", file=rel, urn=urn, tree=tree_name, meta=meta,
             stats=stats, ref=ref, lang=lang)
+
+    @app.route("/about")
+    def about():
+        return render_template("about.html")
 
     @app.route("/tei.css")
     def css():

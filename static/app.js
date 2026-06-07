@@ -36,6 +36,50 @@
     });
   }
 
+  /* ---- home: alphabet jump rail ------------------------------------------- */
+  // The header and the search bar are both sticky near the top, so the letter
+  // dividers (and a #alpha-X jump) land *under* them — it looks like nothing
+  // moved. Publish the real chrome height as --cat-sticky so the dividers pin
+  // just below it (CSS), and use it to offset the jump. Recomputed on resize and
+  // when the search bar grows/shrinks (e.g. the β-code hint bar toggling).
+  var alphaRail = document.querySelector(".alpha-rail");
+  if (alphaRail) {
+    var header = document.querySelector(".site-header");
+    var search = document.querySelector(".search");
+    function chromeHeight() {
+      return (header ? header.offsetHeight : 56) + (search ? search.offsetHeight : 0);
+    }
+    function publishStickyTop() {
+      document.documentElement.style.setProperty("--cat-sticky", chromeHeight() + "px");
+    }
+    publishStickyTop();
+    window.addEventListener("resize", publishStickyTop);
+    if (window.ResizeObserver && search) new ResizeObserver(publishStickyTop).observe(search);
+
+    // Absolute document top via the offset chain — unlike getBoundingClientRect this
+    // is NOT skewed by the divider's own sticky paint offset, and unlike
+    // scrollIntoView() it actually scrolls *to* a sticky target (which Chromium
+    // otherwise treats as already-in-place, so upward jumps did nothing).
+    function docTop(el) {
+      var y = 0;
+      for (var n = el; n; n = n.offsetParent) y += n.offsetTop;
+      return y;
+    }
+
+    alphaRail.addEventListener("click", function (e) {
+      var link = e.target.closest('a[href^="#alpha-"]');
+      if (!link) return;
+      var target = document.getElementById(link.getAttribute("href").slice(1));
+      if (!target) return;
+      e.preventDefault();
+      // Land the target's flow-top exactly at the sticky line so its own divider
+      // pins at the top (the previous letter's divider then releases).
+      var y = Math.max(0, docTop(target) - chromeHeight());
+      window.scrollTo({ top: y, behavior: "smooth" });
+      if (history.replaceState) history.replaceState(null, "", link.getAttribute("href"));
+    });
+  }
+
   /* ---- "/" focuses the most relevant search field ------------------------- */
   document.addEventListener("keydown", function (e) {
     if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;

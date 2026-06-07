@@ -424,6 +424,78 @@ class TestOptionalFullText:
         assert len(ex[key]) <= 51                     # truncated (+ ellipsis) or short
 
 
+class TestAbout:
+    @pytest.fixture(scope="class")
+    def client(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        return app.test_client()
+
+    def test_about_page(self, client):
+        r = client.get("/about")
+        assert r.status_code == 200
+        body = r.get_data(as_text=True)
+        assert "Corpus Liberatum Linguæ Graecæ" in body
+        assert "ANR-24-RRII-0002" in body
+        assert "Inria Quadrant" in body
+        assert "https://cllg-project.github.io/" in body
+
+    def test_about_link_in_header(self, client):
+        # the About link is in the shared header chrome, so it's on every page
+        body = client.get("/").get_data(as_text=True)
+        assert 'class="header-link" href="/about"' in body
+
+
+class TestAlphaRail:
+    """The A–Z jump rail relies on monotonic, unique letter dividers."""
+
+    def test_dividers_sorted_and_unique(self, monkeypatch, tmp_path):
+        import re
+        from pathlib import Path
+        root = tmp_path
+        authors = [("aaa", "Alpha Auctor"), ("vva", "[Valerius] Bracket"),
+                   ("vvb", "Valerius Real"), ("bbb", "Beta Auctor"),
+                   ("ttt", "Tatianus")]
+        paths = [root / f"{aid}/w/{aid}.w.x-grc1.xml" for aid, _ in authors]
+        meta = {str(p): {"title": "T", "author": name}
+                for p, (aid, name) in zip(paths, authors)}
+        monkeypatch.setattr(browse.web, "iter_editions", lambda r: paths)
+        monkeypatch.setattr(browse.web, "read_meta", lambda p: meta[str(p)])
+        monkeypatch.setattr(browse.web, "dts_identifier", lambda p: None)
+        app = browse.create_app(root)
+        app.testing = True
+        body = app.test_client().get("/").get_data(as_text=True)
+        ids = re.findall(r'id="alpha-([A-Z#])"', body)
+        assert ids == sorted(ids)              # monotonic
+        assert len(ids) == len(set(ids))       # no stray duplicate divider
+        # the bracketed pseudo-author folds under its real letter, not '['
+        assert ids.count("V") == 1 and "V" in ids
+
+
+class TestBetaHint:
+    """The β-code hint bar is hidden until the toggle is enabled."""
+
+    def _bar_tag(self, body):
+        import re
+        m = re.search(r'<div class="beta-hint"[^>]*id="hint-bar"[^>]*>', body)
+        return m.group(0) if m else ""
+
+    def test_hidden_when_beta_off(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        tag = self._bar_tag(app.test_client().get("/").get_data(as_text=True))
+        assert tag and "hidden" in tag
+
+    def test_visible_when_beta_on(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        tag = self._bar_tag(app.test_client().get("/?beta=1").get_data(as_text=True))
+        assert tag and "hidden" not in tag
+
+
 def test_fts_similarity_context_marks_shared():
     import sqlite3
     conn = sqlite3.connect(":memory:")

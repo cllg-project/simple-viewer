@@ -168,7 +168,10 @@ button { font-family: inherit; }
   background: color-mix(in srgb, var(--header-ink) 12%, transparent);
   padding: 2px 6px; border-radius: 4px;
 }
-.header-actions { display: flex; align-items: center; gap: 6px; }
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.header-link { color: var(--header-ink); text-decoration: none; font-size: 13px; font-weight: 600;
+  opacity: .85; white-space: nowrap; }
+.header-link:hover { color: var(--header-ink); opacity: 1; text-decoration: underline; }
 .icon-btn {
   appearance: none; border: 1px solid color-mix(in srgb, var(--header-ink) 24%, transparent);
   background: color-mix(in srgb, var(--header-ink) 8%, transparent);
@@ -285,6 +288,9 @@ button { font-family: inherit; }
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
   border-radius: var(--radius); padding: 9px 13px; font-size: 12.5px;
 }
+/* `display:grid` above outranks the UA `[hidden]{display:none}` (same specificity,
+   later wins), so the hint bar must opt back out explicitly when hidden. */
+.beta-hint[hidden] { display: none; }
 .beta-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-2); }
 .beta-legend b { font-family: var(--mono); color: var(--ink); background: var(--paper-2);
   padding: 0 4px; border-radius: 3px; border: 1px solid var(--rule); }
@@ -323,7 +329,13 @@ button { font-family: inherit; }
 /* author accordion */
 .catalogue { border-top: 1px solid var(--rule); }
 .alpha-divider {
-  position: sticky; top: 56px; z-index: 5;
+  /* pin just below the sticky header + search bar (their measured total height is
+     published as --cat-sticky by app.js; 124px is a sane no-JS fallback). The same
+     value offsets a rail jump so the target isn't hidden under that chrome. */
+  position: sticky; top: var(--cat-sticky, 124px); z-index: 5;
+  /* land a jump exactly at the sticky line so the *target* letter's divider pins
+     at the top (not the previous one, which would otherwise cover it) */
+  scroll-margin-top: var(--cat-sticky, 124px);
   font-family: var(--serif); font-weight: 700; font-size: 13px; color: var(--accent);
   background: color-mix(in srgb, var(--accent) 9%, var(--paper));
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
@@ -798,3 +810,21 @@ a.sim-row:hover .sim-go { color: var(--accent); transform: translateX(2px); }
   .fr-go { display: none; }
   .stats-hero h1 { font-size: 24px; }
 }
+
+/* ============================================================================
+   ABOUT
+   ============================================================================ */
+.about { max-width: 720px; }
+.about-hero { padding: 30px 0 8px; }
+.about-hero .kicker { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 7px; }
+.about-hero h1 { font-family: var(--serif); font-weight: 700; font-size: 28px; margin: 0;
+  letter-spacing: .01em; line-height: 1.15; }
+.about-lead { font-family: var(--serif); font-size: 16px; color: var(--ink-2);
+  font-style: italic; margin: 8px 0 22px; }
+.about-card .about-body { padding: 15px 18px 18px; font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+.about-card .about-body p { margin: 0 0 10px; }
+.about-card .about-body b { color: var(--ink); }
+.about-card .about-body code { font-family: var(--mono); font-size: 12.5px; color: var(--ink);
+  background: var(--paper-3); padding: 2px 6px; border-radius: 5px; }
+.about-site { margin-top: 4px; }
