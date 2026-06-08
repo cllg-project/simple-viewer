@@ -14,6 +14,7 @@ from flask import (Flask, Response, abort, jsonify, render_template, request,
 from markupsafe import Markup
 
 from .betacode import to_greek
+from .bibl import DEFAULT_BIBL_DB, bibl_connect, get_bibl
 from .corpus import (DEFAULT_DB, DEFAULT_DTS_BASE, dts_document_url,
                      dts_identifier, iter_editions, passage_neighbors,
                      read_meta, safe_path, walk_reffs)
@@ -75,7 +76,8 @@ def _page_window(page: int, pages: int) -> List:
 def create_app(root: Path, db_path: Path = DEFAULT_DB,
                dts_base: str = DEFAULT_DTS_BASE, enable_fts: bool = False,
                enable_vectors: bool = False,
-               vectors_db: Path = DEFAULT_VECTORS_DB):
+               vectors_db: Path = DEFAULT_VECTORS_DB,
+               bibl_db: Path = DEFAULT_BIBL_DB):
     app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
     renderer = Renderer()
 
@@ -192,6 +194,10 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
     vectors = VectorStore.open(vectors_db) if enable_vectors else None
     vectors_on = vectors is not None
 
+    # Optional bibliographic cache (var/bibl.sqlite built by `browse.py bibl`).
+    # Read-only; None when absent — reading pages simply omit the edition block.
+    _bibl_conn = bibl_connect(bibl_db)
+
     @app.route("/")
     def home():
         q_raw = (request.args.get("q") or "").strip()
@@ -281,7 +287,8 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             "doc.html", file=rel, meta=meta, reffs=_reffs_view(flat),
             levels=_level_names(flat), units=len(flat), toplevel=toplevel,
             trees=trees, tree=tree, urn=urn, dts_url=dts_url, current=None,
-            first_ref=first_ref, next_ref=next_ref, opening_html=opening_html)
+            first_ref=first_ref, next_ref=next_ref, opening_html=opening_html,
+            bibl=get_bibl(_bibl_conn, urn))
 
     @app.route("/passage")
     def passage():
@@ -317,7 +324,7 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             tree=tree_name, body=body, urn=urn, dts_url=dts_url, meta=meta,
             reffs=_reffs_view(flat, current=ref), levels=_level_names(flat),
             units=len(flat), prev_ref=prev_ref, next_ref=next_ref,
-            vectors_on=vectors_on)
+            vectors_on=vectors_on, bibl=get_bibl(_bibl_conn, urn))
 
     @app.route("/similar")
     def similar_api():

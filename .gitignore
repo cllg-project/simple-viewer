@@ -7,5 +7,8 @@ __pycache__/
 # Cloned corpus texts (fetched by `make install`)
 /corpus/
 
+# Bibliographic source database (large, not versioned)
+/bibl.xml
+
 # Generated search index (whole dir is build output)
 /var/

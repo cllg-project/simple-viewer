@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 
+from .bibl import DEFAULT_BIBL_DB, DEFAULT_BIBL_XML, build_bibl_cache
 from .corpus import DEFAULT_DB, DEFAULT_DTS_BASE, DEFAULT_ROOT
 from .search import DEFAULT_TIMEOUT, build_index
 from .vectors import (DEFAULT_BATCH_SIZE, DEFAULT_MODEL_DIR, DEFAULT_MODEL_ID,
@@ -22,6 +23,7 @@ browse the CLLG TEI corpus as HTML excerpts.
                         [--vectors --vectors-db var/vectors/vectors.sqlite]
     browse.py index     [--root data] [--db var/search.sqlite]
                         [--jsonl PATH] [-j JOBS] [--timeout SECONDS]
+    browse.py bibl      [--bibl-xml bibl.xml] [--bibl-db var/bibl.sqlite]
     browse.py vectorize [--root data] [--vectors-db var/vectors/vectors.sqlite]
                         [--model HF_ID] [--model-dir DIR] [-j JOBS]
                         [--timeout SECONDS] [--batch-size N] [--device auto|cpu|cuda]
@@ -63,7 +65,16 @@ def main(argv: Optional[List[str]] = None) -> int:
                               "(requires a store built by `browse.py vectorize`)")
     p_serve.add_argument("--vectors-db", type=Path, default=DEFAULT_VECTORS_DB,
                          help="SQLite vector store used by --vectors")
+    p_serve.add_argument("--bibl-db", type=Path, default=DEFAULT_BIBL_DB,
+                         help="SQLite bibliographic cache (built by `browse.py bibl`)")
     p_serve.add_argument("--debug", action="store_true")
+
+    p_bibl = sub.add_parser(
+        "bibl", help="(optional) build the SQLite bibliographic cache from bibl.xml")
+    p_bibl.add_argument("--bibl-xml", type=Path, default=DEFAULT_BIBL_XML,
+                        help="source bibliographic XML (default: bibl.xml)")
+    p_bibl.add_argument("--bibl-db", type=Path, default=DEFAULT_BIBL_DB,
+                        help="output SQLite cache (default: var/bibl.sqlite)")
 
     p_index = sub.add_parser(
         "index", help="(optional) build the SQLite FTS5 full-text search engine")
@@ -108,6 +119,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args = parser.parse_args(argv)
 
+    if args.command == "bibl":
+        n = build_bibl_cache(args.bibl_xml.resolve(), args.bibl_db.resolve())
+        print(f"wrote {n} bibliographic entries → {args.bibl_db}")
+        return 0
+
     if args.command == "index":
         jsonl = args.jsonl.resolve() if args.jsonl else None
         return build_index(args.root.resolve(), args.db.resolve(), jsonl,
@@ -129,9 +145,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     enable_fts = getattr(args, "fulltext", False)
     enable_vectors = getattr(args, "vectors", False)
     vectors_db = getattr(args, "vectors_db", DEFAULT_VECTORS_DB)
+    bibl_db = getattr(args, "bibl_db", DEFAULT_BIBL_DB)
     debug = getattr(args, "debug", False)
     app = create_app(root, db_path=db_path, dts_base=dts_base, enable_fts=enable_fts,
-                     enable_vectors=enable_vectors, vectors_db=vectors_db)
+                     enable_vectors=enable_vectors, vectors_db=vectors_db,
+                     bibl_db=bibl_db)
     print(f"serving {root} on http://{host}:{port}")
     app.run(host=host, port=port, debug=debug)
     return 0

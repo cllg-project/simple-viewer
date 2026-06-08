@@ -19,6 +19,14 @@
       {% for t in trees %}<a class="dts-link" href="{{ doc_url(file, t) }}">{{ t }}</a>{% endfor %}
     </div>
     {% endif %}
+    {% if bibl %}
+    <div class="bibl-source">
+      <span class="lbl-sub">Source edition</span>
+      <cite class="bibl-cite">
+        <span class="bibl-title">{{ bibl.title }}</span>{% if bibl.editor %}, ed. {{ bibl.editor }}{% endif %}{% if bibl.pub_place or bibl.publisher %} · {{ bibl.pub_place }}{% if bibl.publisher %}: {{ bibl.publisher }}{% endif %}{% endif %}{% if bibl.date %}, {{ bibl.date }}{% endif %}{% if bibl.pages %} (pp. {{ bibl.pages }}){% endif %}
+      </cite>
+    </div>
+    {% endif %}
     <div class="work-stats">
       <div class="stat"><div class="n">{{ units }}</div><div class="l">citeable passages</div></div>
       <div class="stat"><div class="n">{{ toplevel }}</div><div class="l">top-level units</div></div>

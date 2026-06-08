@@ -6,6 +6,7 @@ The implementation lives in the `cllg_viewer` package:
 
     browse.py serve  [--root data] [--host 127.0.0.1] [--port 5000]
                      [--fulltext --db var/search.sqlite] [--dts-base URL]
+    browse.py bibl   [--bibl-xml bibl.xml] [--bibl-db var/bibl.sqlite]
     browse.py index  [--root data] [--db var/search.sqlite]
                      [--jsonl PATH] [-j JOBS] [--timeout SECONDS]
 
