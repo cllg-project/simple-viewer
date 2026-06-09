@@ -1,0 +1,61 @@
+{% extends "_reader.html" %}
+{% block title %}{{ meta.title }} · CLLG Light{% endblock %}
+{% block header_meta %}<code>{{ urn or file }}</code>{% endblock %}
+{% block reader_main %}
+<div class="work-landing">
+  <div class="work-card">
+    <div class="kicker">Distributed Text Services · reading view</div>
+    <h1 lang="la">{{ meta.title or file }}</h1>
+    <div class="byline">{{ meta.author }}</div>
+    {% if urn %}
+    <div class="urn-line">
+      <code>{{ urn }}</code>
+      {% if dts_url %}<a class="dts-link" href="{{ dts_url }}">document endpoint ↗</a>{% endif %}
+    </div>
+    {% endif %}
+    {% if trees|length > 1 %}
+    <div class="urn-line">
+      <span class="lbl-sub">trees:</span>
+      {% for t in trees %}<a class="dts-link" href="{{ doc_url(file, t) }}">{{ t }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if bibl %}
+    <div class="bibl-source">
+      <span class="lbl-sub">Source edition</span>
+      <cite class="bibl-cite">
+        <span class="bibl-title">{{ bibl.title }}</span>{% if bibl.editor %}, ed. {{ bibl.editor }}{% endif %}{% if bibl.pub_place or bibl.publisher %} · {{ bibl.pub_place }}{% if bibl.publisher %}: {{ bibl.publisher }}{% endif %}{% endif %}{% if bibl.date %}, {{ bibl.date }}{% endif %}{% if bibl.pages %} (pp. {{ bibl.pages }}){% endif %}
+      </cite>
+    </div>
+    {% endif %}
+    <div class="work-stats">
+      <div class="stat"><div class="n">{{ units }}</div><div class="l">citeable passages</div></div>
+      <div class="stat"><div class="n">{{ toplevel }}</div><div class="l">top-level units</div></div>
+      {% if levels %}
+      <div class="stat">
+        <div class="l" style="margin-bottom:4px">citation levels</div>
+        <div class="levels">
+          {% for lv in levels %}{% if not loop.first %}<span class="arrow">›</span>{% endif %}<span class="lv">{{ lv }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="landing-cta">
+      {% if first_ref %}<a class="btn" href="{{ passage_url(file, first_ref, tree) }}">Start reading ↓</a>{% endif %}
+      <a class="btn btn--ghost" href="{{ passage_url(file, tree=tree) }}">Read whole work</a>
+      <a class="btn btn--ghost" href="{{ stats_url(file, tree) }}">Word statistics</a>
+    </div>
+  </div>
+</div>
+{% if opening_html %}
+<div class="opening-head">Opening passage</div>
+<div class="tei-text" lang="grc">{{ opening_html }}</div>
+<div class="pager">
+  <span class="disabled prev">opening of work</span>
+  {% if next_ref %}
+  <a class="next" href="{{ passage_url(file, next_ref, tree) }}">
+    <div class="pg-meta"><span class="pg-dir">Next ›</span><span class="pg-ref">{{ next_ref }}</span></div>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

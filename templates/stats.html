@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Token statistics · {{ meta.title }} · CLLG Light{% endblock %}
+{% block header_meta %}<code>{{ urn or file }}</code>{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="{{url_for('home')}}">Home</a>
+  <span class="sep">›</span>
+  <a href="{{url_for('home')}}?q={{ (meta.author or '')|urlencode }}">{{ meta.author or '—' }}</a>
+  <span class="sep">›</span>
+  <a href="{{ doc_url(file, tree) }}" lang="la">{{ meta.title }}</a>
+  <span class="sep">›</span>
+  <span class="here">Token statistics</span>
+</nav>
+{% endblock %}
+{% block content %}
+{% set back = passage_url(file, ref, tree) if ref else doc_url(file, tree) %}
+<div class="page stats-page">
+  <div class="wrap">
+    <header class="stats-hero">
+      <div class="sh-text">
+        <div class="kicker">Token statistics · whole work</div>
+        <h1 lang="la">{{ meta.title or file }}</h1>
+        <div class="byline">{{ meta.author }}</div>
+        {% if urn %}<div class="urn-line"><code>{{ urn }}</code></div>{% endif %}
+      </div>
+      <a class="btn btn--ghost stats-back" href="{{ back }}">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/></svg>
+        Back to reading
+      </a>
+    </header>
+
+    {% if not stats.tokens %}
+    <div class="empty-state">
+      <div class="glyph">∅</div>
+      <h3>No tokens to count</h3>
+      <p>This work produced no readable text to tokenise.</p>
+    </div>
+    {% else %}
+    {% set max_count = stats.top[0].count %}
+    <div class="stat-cards">
+      <div class="stat-card is-accent">
+        <div class="sc-value">{{ "{:,}".format(stats.tokens) }}</div>
+        <div class="sc-label">Tokens</div><div class="sc-sub">running words</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-value">{{ "{:,}".format(stats.types) }}</div>
+        <div class="sc-label">Distinct forms</div><div class="sc-sub">types</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-value">{{ "{:,}".format(stats.hapax) }}</div>
+        <div class="sc-label">Hapax legomena</div>
+        <div class="sc-sub">{{ "%.0f"|format(stats.hapax_share * 100) }}% of forms</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-value">{{ "%.3f"|format(stats.ttr) }}</div>
+        <div class="sc-label">Type–token ratio</div><div class="sc-sub">lexical variety</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-value">{{ "%.1f"|format(stats.mean_word_len) }}</div>
+        <div class="sc-label">Mean length</div><div class="sc-sub">letters / token</div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="freq-panel panel">
+        <div class="panel-head">
+          <div>
+            <h2>Most frequent forms</h2>
+            <p>Top {{ stats.top|length }} surface forms · {{ "{:,}".format(stats.types) }} distinct in all</p>
+          </div>
+          <div class="freq-legend">
+            <span class="lg fn"><i></i> function word</span>
+            <span class="lg ct"><i></i> lexical word</span>
+          </div>
+        </div>
+        <ol class="freq-rows">
+          {% for w in stats.top %}
+          <li>
+            <a class="freq-row{% if w.content %} is-content{% endif %}"
+               href="{{url_for('home')}}?scope=text&q={{ w.form|urlencode }}"
+               title="Search “{{ w.form }}” inside texts · {{ w.pos_label }}">
+              <span class="fr-rank">{{ w.rank }}</span>
+              <span class="fr-form" lang="{{ lang }}">{{ w.form }}</span>
+              <span class="fr-track">
+                <span class="fr-fill" style="width:{{ (w.count / max_count * 100)|round(1) }}%">
+                  <span class="fr-count">{{ "{:,}".format(w.count) }}</span>
+                </span>
+              </span>
+              <span class="fr-share">{{ "%.1f"|format(w.share * 100) }}%</span>
+              <span class="fr-go" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              </span>
+            </a>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+
+      <div class="stats-side">
+        {% set fn = stats.composition.fn %}
+        {% set ct = stats.composition.content %}
+        {% set tot = (fn + ct) or 1 %}
+        <div class="comp-panel panel">
+          <div class="panel-head"><div><h2>Function vs lexical</h2><p>Share of running tokens</p></div></div>
+          <div class="comp-bar" role="img"
+               aria-label="Function words {{ "%.0f"|format(fn / tot * 100) }} percent, lexical words {{ "%.0f"|format(ct / tot * 100) }} percent">
+            <span class="comp-seg fn" style="width:{{ (fn / tot * 100)|round(2) }}%"><b>{{ "%.0f"|format(fn / tot * 100) }}%</b></span>
+            <span class="comp-seg ct" style="width:{{ (ct / tot * 100)|round(2) }}%"><b>{{ "%.0f"|format(ct / tot * 100) }}%</b></span>
+          </div>
+          <div class="comp-key">
+            <span class="lg fn"><i></i> function · {{ "{:,}".format(fn) }}</span>
+            <span class="lg ct"><i></i> lexical · {{ "{:,}".format(ct) }}</span>
+          </div>
+          <ul class="insights">
+            <li><b>{{ "%.0f"|format(stats.hapax_share * 100) }}%</b> of distinct forms are
+              <em>hapax legomena</em> — they occur exactly once.</li>
+            <li>The {{ stats.top|length }} most frequent forms cover
+              <b>{{ "%.0f"|format(stats.top_coverage * 100) }}%</b> of all running text.</li>
+            {% if stats.first_content %}
+            <li>First lexical word: <b lang="{{ lang }}">{{ stats.first_content.form }}</b>,
+              at rank <b>{{ stats.first_content.rank }}</b>.</li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div class="zipf-panel panel">
+          <div class="panel-head"><div><h2>Frequency distribution</h2><p>Rank × frequency, log–log — a Zipfian fall-off</p></div></div>
+          {% set z = stats.zipf_geom %}
+          {% if z %}
+          <svg class="zipf-svg" viewBox="0 0 {{ z.w }} {{ z.h }}" role="img"
+               aria-label="Rank-frequency distribution on log-log axes">
+            {% for t in z.y_ticks %}
+            <line x1="{{ z.padL }}" x2="{{ z.w - z.padR }}" y1="{{ t.y }}" y2="{{ t.y }}" class="zg"/>
+            <text x="{{ z.padL - 8 }}" y="{{ t.y + 3 }}" class="zlabel ya">{{ t.label }}</text>
+            {% endfor %}
+            {% for t in z.x_ticks %}
+            <line x1="{{ t.x }}" x2="{{ t.x }}" y1="{{ z.padT }}" y2="{{ z.h - z.padB }}" class="zg"/>
+            <text x="{{ t.x }}" y="{{ z.h - z.padB + 16 }}" class="zlabel xa">{{ t.label }}</text>
+            {% endfor %}
+            <text x="{{ z.padL + z.iw / 2 }}" y="{{ z.h - 4 }}" class="zaxis">rank →</text>
+            <text x="14" y="{{ z.padT + z.ih / 2 }}" class="zaxis"
+                  transform="rotate(-90 14 {{ z.padT + z.ih / 2 }})">frequency →</text>
+            <path d="{{ z.path }}" class="zline"/>
+            {% for m in z.marks %}
+            <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.4" class="zdot"/>
+            {% if m.label %}<text x="{{ m.x + 7 }}" y="{{ m.y - 5 }}" class="zmark" lang="{{ lang }}">{{ m.form }}</text>{% endif %}
+            {% endfor %}
+          </svg>
+          {% else %}
+          <div class="zipf-empty">Too few distinct forms to plot a distribution.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <p class="stats-note">
+      Counts are computed over the full plain text of this work. Function vs lexical
+      uses a function-word stoplist (no lemmatiser). Click any form to search for it
+      inside the corpus.
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

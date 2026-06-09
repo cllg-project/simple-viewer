@@ -1,0 +1,22 @@
+# Build-only deps for GPU vectorizing.  Like requirements-vectors.txt but swaps the
+# CPU ONNX Runtime for the CUDA build PLUS the CUDA 12 / cuDNN 9 runtime libraries
+# it loads at run time (shipped as pip wheels, so no system CUDA toolkit needed).
+#
+# IMPORTANT:
+#   * onnxruntime and onnxruntime-gpu are mutually exclusive — they share the
+#     `onnxruntime` import name.  Install this file in a CLEAN env (or
+#     `pip uninstall onnxruntime` first), never alongside requirements-vectors.txt.
+#   * onnxruntime-gpu 1.26 needs CUDA 12.x + cuDNN 9.x.  A newer NVIDIA driver
+#     (e.g. CUDA 13.x in `nvidia-smi`) is fine — the driver is backward-compatible;
+#     it's the CUDA 12 *runtime* libraries below that must be present.  Encoder
+#     calls onnxruntime.preload_dlls() to load them from these wheels.
+#   * Serving never needs any of this.
+onnxruntime-gpu>=1.17       # CUDA execution provider for the encoder
+nvidia-cuda-runtime-cu12    # libcudart.so.12
+nvidia-cublas-cu12          # libcublas.so.12 / libcublasLt.so.12
+nvidia-cufft-cu12           # libcufft.so.11
+nvidia-curand-cu12          # libcurand.so.10
+nvidia-cudnn-cu12>=9,<10    # libcudnn.so.9
+tokenizers>=0.15            # WordPiece tokenizer for the model
+huggingface_hub>=0.20       # downloads the model snapshot
+numpy>=1.24                 # mean-pooling / L2-normalization during encoding

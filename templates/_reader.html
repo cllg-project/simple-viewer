@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="{{url_for('home')}}">Home</a>
+  <span class="sep">›</span>
+  <a href="{{url_for('home')}}?q={{ (meta.author or '')|urlencode }}">{{ meta.author or '—' }}</a>
+  <span class="sep">›</span>
+  {% if current %}
+    <a href="{{ doc_url(file, tree) }}" lang="la">{{ meta.title }}</a>
+    <span class="sep">›</span>
+    <span class="here">{{ current }}</span>
+  {% else %}
+    <span class="here" lang="la">{{ meta.title }}</span>
+  {% endif %}
+</nav>
+{% endblock %}
+{% block content %}
+<div class="reader page" data-rail="left">
+  <div class="scrim" id="rail-scrim"></div>
+  <aside class="nav-rail" id="nav-rail" aria-label="Citation tree">
+    <div class="rail-head">
+      <div class="rail-title">
+        <span lang="la">{{ meta.title }}</span>
+        <span class="au">{{ meta.author }}</span>
+      </div>
+      <div class="rail-sub">{{ units }} citeable passage{{ '' if units == 1 else 's' }}{% if levels %} ·
+        levels: {{ levels|join(' › ') }}{% endif %}</div>
+      <div class="rail-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="search" id="rail-filter" placeholder="jump to ref… (e.g. 12.1)"
+               spellcheck="false" autocomplete="off" aria-label="Search within this work">
+      </div>
+    </div>
+    <nav class="reffs" id="reffs">
+      {% for r in reffs %}
+        <a class="level-{{ r.level }}{% if r.current %} is-current{% endif %}"
+           {% if r.current %}aria-current="true"{% endif %}
+           data-text="{{ (r.ref ~ ' ' ~ r.citeType)|lower }}"
+           href="{{ passage_url(file, r.ref, tree) }}">
+          <span class="ref-n">{{ r.ref }}</span>
+          <span class="ref-label">{{ r.citeType }}</span>
+        </a>
+      {% else %}
+        <div class="reff-group-empty">No citeable references.</div>
+      {% endfor %}
+    </nav>
+  </aside>
+  <div class="reader-main">
+    {% block reader_main %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

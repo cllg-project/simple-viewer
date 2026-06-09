@@ -25,6 +25,10 @@ organised **Author → Work** with a search box to find your way around.
   engine would index.
 - **Optional full-text search** (opt-in): a self-contained SQLite FTS5 index, no
   external service.
+- **Optional semantic “Similar passages”** (opt-in): each leaf passage is embedded
+  with an ONNX sentence-transformer; every reading page can show the nearest
+  passages across the whole corpus. Vectors are precomputed at build time, so
+  **serving needs no ML runtime** — just a single portable `vectors.sqlite`.
 - **DTS API link** on every reading page (the passage's CTS URN + a deep link into a
   running DTS server).
 
@@ -49,11 +53,13 @@ make install CORPUS_REPO=https://example.org/your/corpus.git CORPUS_DIR=corpus
 
 | Command | What it does |
 |---------|--------------|
-| `make run`  | Production server via **gunicorn** (`wsgi:app`), `HOST`/`PORT`/`WORKERS` overridable. |
+| `make run`  | Production server via **gunicorn** (`wsgi:app`), `HOST`/`PORT`/`WORKERS` overridable; `FULLTEXT=1` / `VECTORS=1` enable the search layers. |
 | `make dev`  | Flask development server. |
 | `make index`| Build the optional full-text search index (`var/search.sqlite`). |
+| `make vectorize` | Build the optional semantic vector store (`var/vectors/vectors.sqlite`). |
+| `make similar` | Build the vector store (if missing) then serve with “Similar passages” on. |
 | `make test` | Run the test suite (uses an embedded fixture corpus — no clone needed). |
-| `make clean`| Remove the venv, the index and the cloned corpus. |
+| `make clean`| Remove the venv, the indexes/models and the cloned corpus. |
 
 Examples:
 
@@ -61,7 +67,42 @@ Examples:
 make run PORT=9000 WORKERS=4
 make index && make run                 # build index, then...
 CLLG_FULLTEXT=1 make run               # ...serve with full-text search enabled
+
+# both search layers at once, under gunicorn:
+make run FULLTEXT=1 VECTORS=1
+# (equivalent to: CLLG_FULLTEXT=1 CLLG_VECTORS_ON=1 make run)
+# dev server, both layers:
+browse.py serve --fulltext --db var/search.sqlite \
+                --vectors  --vectors-db var/vectors/vectors.sqlite
 ```
+
+### Semantic “Similar passages” (optional)
+
+Embedding the corpus needs build-only ML deps; **serving does not**.
+
+```bash
+make deps-vectors            # CPU:  onnxruntime, tokenizers, huggingface_hub, numpy
+# or, on an NVIDIA GPU (mutually exclusive with the CPU deps — use a clean venv):
+make deps-vectors-gpu        # CUDA: onnxruntime-gpu + CUDA 12 / cuDNN 9 runtime wheels
+
+make vectorize                              # build var/vectors/vectors.sqlite
+make vectorize FROM_FTS=var/search.sqlite   # reuse FTS text, skip re-rendering
+browse.py vectorize --device cuda --batch-size 128   # explicit GPU run
+```
+
+Notes:
+
+- **Build once, serve anywhere.** Copy the single `var/vectors/vectors.sqlite` to a
+  serve host and `pip install -r requirements.txt` (which includes the
+  `sqliteai-vector` extension). No model, no ML runtime needed to serve.
+- `--from-fts` pulls the already-rendered leaf text out of an existing FTS index so
+  the corpus is not rendered a second time.
+- **GPU**: `--device auto` (the default) uses CUDA when available, else CPU. A newer
+  driver (e.g. CUDA 13.x in `nvidia-smi`) is fine — the CUDA 12 / cuDNN 9 *runtime*
+  wheels are installed by `make deps-vectors-gpu`. Encoding auto-splits a batch on
+  out-of-memory, so a large `--batch-size` self-tunes rather than crashing.
+- If a host's `sqlite3` cannot load extensions, the feature silently turns off (the
+  panel just isn't shown) — same opt-in degrade as full-text search.
 
 ### Configuration (environment variables)
 
@@ -69,7 +110,7 @@ CLLG_FULLTEXT=1 make run               # ...serve with full-text search enabled
 |----------|---------|---------|
 | `CLLG_ROOT` | `./corpus/data` | corpus data directory (CapiTainS layout) |
 | `CLLG_DB` | `./var/search.sqlite` | full-text index path |
-| `CLLG_DTS_BASE` | `http://localhost:8000` | DTS server base URL for the reading-page link |
+| `CLLG_DTS_BASE` | *(unset)* | external DTS server base URL; when set, adds a "DTS API ↗" deep-link on reading pages (the viewer is not itself a DTS server) |
 | `CLLG_FULLTEXT` | *(off)* | set to `1`/`true` to enable full-text search under gunicorn |
 
 The CLI flags `--root`, `--db`, `--dts-base`, `--fulltext` override these.
@@ -86,8 +127,10 @@ The CLI flags `--root`, `--db`, `--dts-base`, `--fulltext` override these.
    HTML fragment  ──►  Flask  ──►  browser
 ```
 
-- `browse.py` — the Flask app + the `serve` / `index` CLI.
-- `wsgi.py` — gunicorn entrypoint (`gunicorn wsgi:app`).
+- `cllg_viewer/` — the package: `rendering` (Saxon), `corpus` (discovery/DTS),
+  `search` (FTS5 + parallel index), `web` (Flask app), `cli` (argparse).
+- `browse.py` / `wsgi.py` — thin entry points (`serve` / `index` CLI; `gunicorn wsgi:app`).
+- `templates/` + `static/app.css` — the UI chrome (Jinja templates + page styles).
 - `xslt/tei-to-html.xsl` — TEI → HTML presentation transform.
 - `xslt/tei-to-text.xsl` — TEI → plain text (notes dropped) for indexing.
 - `xslt/tei.css` — styles; every class documents its TEI source.

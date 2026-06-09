@@ -1,177 +1,187 @@
 /* ===========================================================================
-   tei.css - styling for the HTML produced by xslt/tei-to-html.xsl
+   tei.css — styling for the HTML produced by xslt/tei-to-html.xsl
 
-   Every rule below documents which TEI element/attribute generated the class it
-   targets. The HTML is a *fragment* (no <html>/<body>); host it inside a page
-   whose container carries the .tei-text class (browse.py does this).
+   Every rule documents which TEI element/attribute generated the class it
+   targets. The HTML is a *fragment* (no <html>/<body>); host it inside a
+   container carrying the .tei-text class (the reader templates do this).
+
+   Design tokens (--ink, --serif, --paper, …) come from static/app.css; this
+   sheet only *consumes* them, so the rendered text follows the active theme.
 
    Class index (class  <-  TEI source):
      .tei-div        <-  <div>            (data-type/-subtype/-n carry @type/@subtype/@n)
-     .tei-ref-n      <-  @n of a <div> that has no <head> (visible citation tag)
+     .tei-ref-n      <-  @n of a <div> with no <head> (visible citation tag)
      .tei-head       <-  <head>           (rendered as <h2>..<h6> by nesting depth)
      .tei-head-label <-  <label type="head">
      .tei-label      <-  <label>          (other types)
      .tei-p          <-  <p>
      .tei-ab         <-  <ab>
-     .tei-lg         <-  <lg>             (verse group)
-     .tei-l          <-  <l>              (verse line, data-n = @n)
-     .tei-lineno     <-  @n of an <l>     (line-number gutter)
-     .tei-l-text     <-  text run of an <l>
-     .tei-sp         <-  <sp>             (speech)
-     .tei-speaker    <-  <speaker>
-     .tei-list/.tei-item  <-  <list>/<item>
-     .tei-figure/.tei-graphic/.tei-figdesc  <-  <figure>/<graphic>/<figDesc>
-     .tei-hi         <-  <hi>             (also rendered as <em>/<strong>/<sup>/<sub>)
-     .tei-rend-*     <-  <hi> with an unmapped @rend value (e.g. tei-rend-smallcaps)
-     .tei-choice     <-  <choice>         (shows reading text; variant in @title)
+     .tei-lg / .tei-l / .tei-lineno / .tei-l-text  <-  <lg>/<l> (verse, @n gutter)
+     .tei-sp / .tei-speaker  <-  <sp>/<speaker>
+     .tei-list / .tei-item   <-  <list>/<item>
+     .tei-figure / .tei-graphic / .tei-figdesc  <-  <figure>/<graphic>/<figDesc>
+     .tei-hi         <-  <hi>             (also <em>/<strong>/<sup>/<sub>)
+     .tei-rend-*     <-  <hi> with an unmapped @rend value
+     .tei-choice     <-  <choice>         (reading shown; variant in @title)
      .tei-corr/.tei-expan/.tei-reg        <-  bare reading-side apparatus
      .tei-sic/.tei-abbr/.tei-orig         <-  bare non-reading apparatus
      .tei-foreign    <-  <foreign>        (lang = @xml:lang)
      .tei-gap        <-  <gap>            (shows "[…]"; @reason/@extent in @title)
-     .tei-supplied   <-  <supplied>       (wrapped in ⟨ ⟩)
-     .tei-unclear    <-  <unclear>
-     .tei-add/.tei-del  <-  <add>/<del>   (also <ins>/<del>)
-     .tei-seg        <-  <seg>
-     .tei-w          <-  <w>
-     .tei-g          <-  <g>              (glyph)
-     .tei-quote/.tei-q/.tei-cit  <-  <quote>/<q>/<cit>
-     .tei-bibl       <-  <bibl>
-     .tei-ref        <-  <ref>            (<a> when @target present)
-     .tei-note       <-  <note>           (folded to a hoverable marker)
-     .tei-note-body  <-  the note content (revealed on hover)
+     .tei-supplied   <-  <supplied>       (wrapped in ⟨ ⟩ by the transform)
+     .tei-unclear / .tei-add / .tei-del   <-  <unclear>/<add>/<del>
+     .tei-seg / .tei-w / .tei-g           <-  <seg>/<w>/<g>
+     .tei-quote/.tei-q / .tei-bibl / .tei-ref  <-  <quote>/<q>/<bibl>/<ref>
+     .tei-note / .tei-note-body  <-  <note>  (folded to a hoverable marker)
      .tei-pb/.tei-cb/.tei-lb/.tei-milestone  <-  <pb>/<cb>/<lb>/<milestone>
      .tei-space      <-  <space>          (@quantity non-breaking spaces)
-     .tei-persName/.tei-placeName/.tei-name/.tei-date/...  <-  named entities
-     .tei            <-  CATCH-ALL: any element the stylesheet did not name
-                         explicitly (also gets .tei-<localname>); keeps unknown
-                         markup visible instead of dropping it.
+     .tei-persName/.tei-placeName/…       <-  named entities
+     .tei            <-  CATCH-ALL: any element the stylesheet did not name.
    ========================================================================== */
 
+/* ---- The text column ----------------------------------------------------- *
+   Comfortable measure, generous leading for polytonic reading.               */
 .tei-text {
-  font-family: "Gentium Plus", "Brill", Georgia, serif;
-  font-size: 1.05rem;
-  line-height: 1.6;
-  color: #1a1a1a;
-  max-width: 46rem;
+  font-family: var(--serif, "Gentium Plus", Georgia, serif);
+  color: var(--ink, #29241f);
+  font-size: 20px;
+  line-height: 1.72;
+  max-width: var(--measure, 38rem);
+  margin: 18px auto 0;
+  padding: 0 24px 60px;
+  hanging-punctuation: first;
+  text-wrap: pretty;
 }
+.tei-text :lang(grc), .tei-text [lang="grc"] { font-feature-settings: "kern" 1; }
 
 /* --- Divisions ------------------------------------------------------------ */
-/* <div>: a citeable structural unit (fragment, page, chapter, ...). */
-.tei-div { margin: 0 0 1.5rem; }
-/* @n of a head-less <div>: a small grey citation tag in the left margin. */
+.tei-div { margin: 0 0 1.4em; }
+.tei-div + .tei-div { margin-top: 1.9em; }
+/* @n of a head-less <div>: a small citation tag set ahead of the text. */
 .tei-ref-n {
-  display: inline-block;
-  min-width: 2.2rem;
-  margin-right: .6rem;
-  color: #8a6d3b;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  display: inline-block; min-width: 2.2rem; margin-right: .6rem;
+  font-family: var(--ui); font-size: .62em; font-weight: 700;
+  color: var(--accent); font-variant-numeric: tabular-nums;
+  vertical-align: .15em;
 }
 
 /* --- Headings ------------------------------------------------------------- */
-.tei-head { font-weight: 600; line-height: 1.3; margin: 1.2rem 0 .6rem; }
-/* <label type="head">: an inline running header, not a section title. */
-.tei-head-label { display: block; font-weight: 600; margin: .4rem 0; }
-.tei-label { color: #555; }
+.tei-head {
+  font-weight: 700; font-size: .82em; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin: 1.2rem 0 .9em; line-height: 1.3;
+}
+.tei-head-label { display: block; font-weight: 700; color: var(--ink-2); margin: .4rem 0; }
+.tei-label { color: var(--ink-2); }
 
 /* --- Prose ---------------------------------------------------------------- */
-.tei-p  { margin: 0 0 .8rem; text-align: justify; }
-.tei-ab { margin: 0 0 .8rem; }
+.tei-p, .tei-ab { margin: 0 0 1em; }
+.tei-p + .tei-p { text-indent: 1.4em; margin-top: -.15em; }  /* continuous prose */
 
-/* --- Verse ---------------------------------------------------------------- */
-.tei-lg { margin: 0 0 1rem; }
-/* <l>: each line on its own row, with a line-number gutter. */
-.tei-l { display: flex; gap: .8rem; align-items: baseline; }
-.tei-lineno {
-  flex: 0 0 2.2rem;
-  text-align: right;
-  color: #aaa;
-  font-size: .8em;
-  font-variant-numeric: tabular-nums;
-  user-select: none;
+/* --- Verse ---------------------------------------------------------------- *
+   Line numbers live in an unobtrusive gutter to the LEFT of the text.        */
+.tei-lg { margin: 0 0 1.1em; }
+.tei-l {
+  display: grid; grid-template-columns: 2.6rem 1fr; align-items: baseline;
+  column-gap: .4rem;
 }
-.tei-l-text { white-space: pre-wrap; }
+.tei-lineno {
+  grid-column: 1; text-align: right; user-select: none; -webkit-user-select: none;
+  font-family: var(--ui); font-size: .62em; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; padding-top: .15em;
+}
+.tei-l-text { grid-column: 2; text-indent: -1.1em; padding-left: 1.1em; }
+.tei-l:hover .tei-lineno { color: var(--ink-2); }
 
 /* --- Speech & lists ------------------------------------------------------- */
-.tei-sp { margin: 0 0 .8rem; }
-.tei-speaker { font-weight: 600; margin-right: .4rem; }
-.tei-list { margin: 0 0 .8rem 1.2rem; }
+.tei-sp { margin: 0 0 1em; }
+.tei-speaker { font-weight: 700; margin-right: .4rem; }
+.tei-list { margin: 0 0 1em 1.2rem; }
 .tei-item { margin: .1rem 0; }
 
 /* --- Figures -------------------------------------------------------------- */
 .tei-figure { margin: 1rem 0; text-align: center; }
 .tei-graphic { max-width: 100%; height: auto; }
-.tei-figdesc { font-size: .9em; color: #666; }
+.tei-figdesc { font-size: .8em; color: var(--ink-3); }
 
 /* --- Highlight / rend ----------------------------------------------------- */
-.tei-hi { } /* base; semantic <em>/<strong>/<sup>/<sub> cover the common cases */
-.tei-rend-smallcaps { font-variant: small-caps; }
+.tei-hi { font-style: italic; }
+.tei-rend-smallcaps, .tei-rend-sc { font-style: normal; font-variant: small-caps; letter-spacing: .03em; }
 .tei-rend-underline { text-decoration: underline; }
-.tei-rend-spaced    { letter-spacing: .15em; }
-.tei-rend-overline  { text-decoration: overline; }
+.tei-rend-spaced { font-style: normal; letter-spacing: .18em; }
+.tei-rend-overline { text-decoration: overline; }
+strong.tei-hi { font-style: normal; font-weight: 700; }
 
 /* --- Editorial apparatus -------------------------------------------------- */
 /* <choice>: reading text shown; hover (via @title) reveals the source variant. */
-.tei-choice { border-bottom: 1px dotted #bbb; cursor: help; }
+.tei-choice {
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  text-underline-offset: 3px; cursor: help;
+}
+.tei-choice:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .tei-corr, .tei-reg, .tei-expan { }
-.tei-sic, .tei-orig, .tei-abbr { color: #999; }
+.tei-sic, .tei-orig, .tei-abbr { color: var(--ink-3); }
 .tei-foreign { font-style: italic; }
-.tei-gap { color: #b00; }
-.tei-supplied { color: #06c; }                 /* editor-supplied text in ⟨ ⟩ */
+.tei-foreign[lang="grc"] { font-style: normal; }
+.tei-gap { color: var(--ink-3); font-style: italic; }
+.tei-supplied { color: var(--ink-2); }
 .tei-unclear { opacity: .7; }
-.tei-add { text-decoration: none; color: #060; }
-.tei-del { color: #999; }
+.tei-add { text-decoration: none; color: var(--link); }
+.tei-del { color: var(--ink-3); text-decoration: line-through; }
 
 /* --- Phrase-level --------------------------------------------------------- */
-.tei-seg { }
-.tei-w { }
 .tei-quote, .tei-q { font-style: italic; }
 .tei-bibl { font-variant: small-caps; }
-.tei-ref { color: #06c; text-decoration: none; }
+.tei-ref { color: var(--link); text-decoration: none; }
 .tei-ref:hover { text-decoration: underline; }
 .tei-persName, .tei-placeName, .tei-name { font-variant: small-caps; }
-.tei-date { color: #555; }
+.tei-date { color: var(--ink-2); }
 
-/* --- Notes ---------------------------------------------------------------- */
-/* <note> is folded to a small superscript marker; the body shows on hover. */
+/* --- Notes ---------------------------------------------------------------- *
+   <note> is folded to a small superscript marker; the body shows on hover and
+   can be pinned open by a click (handled in static/app.js).                  */
 .tei-note { position: relative; }
 .tei-note::before {
-  content: "*";
-  vertical-align: super;
-  font-size: .7em;
-  color: #b00;
-  cursor: pointer;
+  content: "✱"; vertical-align: super;
+  font-family: var(--ui); font-size: .58em; font-weight: 700;
+  color: var(--accent); cursor: pointer; padding: 0 1px;
 }
-.tei-note .tei-note-body { display: none; }
-.tei-note:hover .tei-note-body {
-  display: block;
-  position: absolute;
-  left: 0; top: 1.2em;
-  z-index: 10;
-  width: 22rem;
-  padding: .5rem .7rem;
-  background: #fffbe6;
-  border: 1px solid #e0d28a;
-  border-radius: 4px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.15);
-  font-size: .85rem;
-  line-height: 1.4;
+.tei-note .tei-note-body {
+  display: none; position: absolute; left: 0; top: 1.4em; z-index: 30;
+  width: 280px; max-width: 70vw;
+  font-family: var(--ui); font-style: normal; font-size: 13px; line-height: 1.45;
+  color: var(--ink); background: var(--paper-2);
+  border: 1px solid var(--rule-2); border-radius: 8px; box-shadow: var(--shadow-2);
+  padding: 10px 12px;
 }
+.tei-note:hover .tei-note-body,
+.tei-note.open .tei-note-body { display: block; }
 
-/* --- Milestones ----------------------------------------------------------- */
-/* Page/column breaks rendered as small inline markers; line breaks as <br>. */
-.tei-pb::before { content: "❡"; color: #c00aa0; margin: 0 .25em; font-size: .8em; }
-.tei-pb[data-n]::after {
-  content: " p." attr(data-n) " ";
-  color: #b388c9; font-size: .7em; vertical-align: super;
+/* --- Milestones: <pb> page, <cb> column, <lb> line, <milestone> ----------- */
+.tei-pb, .tei-cb, .tei-milestone {
+  display: inline-block; user-select: none; vertical-align: baseline;
+  font-family: var(--ui); font-size: .6em; color: var(--ink-3);
 }
-.tei-cb::before { content: "|"; color: #c00aa0; margin: 0 .25em; }
+.tei-pb { margin: 0 .3em; padding: 0 .5em; border-left: 2px solid var(--rule-2); }
+.tei-pb[data-n]::before { content: "p. " attr(data-n); }
+.tei-cb::before { content: "‖"; color: var(--rule-2); margin: 0 .25em; }
 .tei-milestone[data-n]::before {
-  content: "[" attr(data-unit) " " attr(data-n) "]";
-  color: #999; font-size: .75em; margin: 0 .2em;
+  content: "[" attr(data-unit) " " attr(data-n) "]"; margin: 0 .2em;
 }
 .tei-space { white-space: pre; }
+
+/* --- Search marks inside rendered text ------------------------------------ */
+.tei-text mark {
+  background: var(--mark-bg); color: var(--mark-ink);
+  padding: 0 1px; border-radius: 2px;
+}
+.tei-text mark.current { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* --- Catch-all ------------------------------------------------------------ */
 /* Unknown elements stay visible (no special styling) so nothing is lost. */
 .tei { }
+
+@media (max-width: 600px) {
+  .tei-text { font-size: 18px; padding: 0 14px 50px; }
+  .tei-l { grid-template-columns: 2rem 1fr; }
+}

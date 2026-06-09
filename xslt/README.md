@@ -1,8 +1,9 @@
 # Presentation layer: TEI → HTML / text + a corpus browser
 
 This directory holds the stylesheets that turn the corpus' TEI into something a
-human (HTML) or a search engine (plain text) can consume, plus `../browse.py`,
-a small Flask app to read the texts.
+human (HTML) or a search engine (plain text) can consume. The Flask app that
+drives them lives in the `cllg_viewer/` package at the repo root (entry points
+`browse.py` / `wsgi.py`).
 
 ## Why it is built this way
 
@@ -23,10 +24,12 @@ ever silently dropped.
 | `tei-to-html.xsl` | Presentation transform → **HTML fragment** (no `<html>`/`<body>` wrapper). |
 | `tei-to-text.xsl` | Same model, **plain UTF-8 text** for a search index. Drops notes & apparatus. |
 | `tei.css` | Styles for the HTML; every rule documents the TEI source of its class. |
-| `../browse.py` | Flask app + `index` CLI tying dapytains + saxonche together. |
+| `../cllg_viewer/rendering.py` | `Renderer`: compiles & runs both stylesheets (saxonche). |
+| `../cllg_viewer/web.py` | Flask app; templates in `../templates`, chrome CSS in `../static`. |
+| `../cllg_viewer/search.py` | `index` builder + FTS5 search over the plain-text output. |
 
-Both stylesheets are XSLT 3.0 and run under the `saxonche` processor already in
-the project venv (`./env/bin/python`). They use
+Both stylesheets are XSLT 3.0 and run under the `saxonche` processor in the
+project venv (`.venv/bin/python`). They use
 `xpath-default-namespace="http://www.tei-c.org/ns/1.0"` so the TEI elements match
 without a prefix.
 
@@ -75,8 +78,8 @@ is purely presentational — the HTML is meaningful without it.
 From the repository root:
 
 ```bash
-./env/bin/python browse.py serve              # http://127.0.0.1:5000  (browse data/)
-./env/bin/python browse.py serve --root ../canonicals --port 5001
+.venv/bin/python browse.py serve              # http://127.0.0.1:5000  (browse corpus/data)
+.venv/bin/python browse.py serve --root /path/to/data --port 5001
 ```
 
 - `/` — home page, **organised Author → Work** (each author is a collapsible
@@ -87,15 +90,31 @@ From the repository root:
 
 ### Search
 
-The home-page search box is for **navigation**: it filters the Author → Work list
-by author or work name (substring match). This is always on and needs no index.
+The home page has **two distinct search fields**, chosen with the radio above the
+box:
+
+- **Works** (default) — navigation: filters the Author → Work list by author or
+  work name (substring match). Always on, needs no index.
+- **Inside texts** — full-text content search (see below). Enabled only when an
+  index is built and the server runs with `--fulltext`; otherwise the radio is
+  disabled with a hint to run `make search`.
+
+A **βῆτα code** checkbox lets you type polytonic Greek as ASCII
+(`lo/gos` → λόγος, `*)/anqrwpos` → Ἄνθρωπος): the field transliterates live as you
+type and a **hint bar** shows the diacritic legend (`)` smooth, `(` rough, `/`
+acute, `\` grave, `=` circumflex, `|` iota, `+` diaeresis, `*` capital) plus a live
+preview of the converted query. The conversion (`cllg_viewer/betacode.py`, mirrored
+in `static/betacode.js`) builds each letter as a base character + Unicode combining
+diacritics then NFC-normalises, and also runs server-side so direct URLs / no-JS
+work. This matters because Greek search is accent-sensitive — Beta Code is how you
+type the accents.
 
 **Optional full-text search** over passage *content* is opt-in. Build the index
 once (below), then start the server with `--fulltext`:
 
 ```bash
-./env/bin/python browse.py index            # build the index once
-./env/bin/python browse.py serve --fulltext # then content matches appear too
+.venv/bin/python browse.py index            # build the index once
+.venv/bin/python browse.py serve --fulltext # then content matches appear too
 ```
 
 The engine is **SQLite FTS5** — part of the Python standard library, so there is
@@ -132,10 +151,17 @@ the plain-text export an external search engine would index. Note it indexes
 **every citeable level** (e.g. both a fragment and each of its lines), so a
 fragment's text also appears split across its line records.
 
+Indexing is resilient: a document dapytains cannot navigate (e.g. a citeStructure
+whose unit name compiles to an invalid regex group) is skipped, and a worker that
+*wedges* on a pathological document (a native regex/Saxon spin that would
+otherwise hang the whole run) is abandoned after `--timeout` seconds (default
+120) without any result. Either way the run still finishes and the offending
+files are written to `<db>.skipped.tsv`.
+
 ## Tests
 
 ```bash
-./env/bin/python -m pytest tests/test_presentation.py -q
+.venv/bin/python -m pytest tests/test_presentation.py -q
 ```
 
 Covers both stylesheets (including bare-subtree robustness and note-dropping) and

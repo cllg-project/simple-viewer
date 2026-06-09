@@ -1,7 +1,9 @@
 # CLLG simple viewer - runtime dependencies
 saxonche>=12.5      # XSLT 3.0 processor (runs the presentation stylesheets)
 lxml>=5.0           # XML parsing / passage serialization
-dapytains>=0.0.5    # CapiTainS/DTS passage extraction + navigation (pulls in Flask)
+dapytains>=1.0.0rc1 # CapiTainS/DTS passage extraction + navigation (pulls in Flask)
 Flask>=3.0          # web UI
 gunicorn>=21.0      # production WSGI server
+sqliteai-vector>=1.0  # serve-time vector KNN for "Similar passages" (bundled binary)
+tqdm>=4.66          # progress bars for the index / vectorize builders
 pytest>=8.0         # tests

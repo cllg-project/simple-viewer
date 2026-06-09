@@ -15,7 +15,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import browse  # noqa: E402
+# The implementation now lives in the `cllg_viewer` package; the `browse` alias
+# keeps every call site below unchanged.
+import cllg_viewer as browse  # noqa: E402
 
 TEI = "http://www.tei-c.org/ns/1.0"
 # Self-contained fixture corpus (one small work) so the suite runs anywhere,
@@ -117,12 +119,24 @@ class TestBrowseApp:
     def test_index_lists_works(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        assert b"/doc?file=" in r.data
+        # URN is the primary identifier; the fixture work has one.
+        assert b"/doc?urn=" in r.data
 
     def test_doc_lists_passages(self, client):
+        # ?file= is still accepted as a fallback for addressing the work...
         r = client.get("/doc?file=" + urllib.parse.quote(SAMPLE))
         assert r.status_code == 200
-        assert b"/passage?file=" in r.data
+        # ...but the links it emits are URN-keyed.
+        assert b"/passage?urn=" in r.data
+
+    def test_doc_addressable_by_urn(self, client):
+        from cllg_viewer.corpus import dts_identifier
+        from pathlib import Path
+        urn = dts_identifier(Path(DATA, SAMPLE))
+        assert urn
+        r = client.get("/doc?urn=" + urllib.parse.quote(urn))
+        assert r.status_code == 200
+        assert b"/passage?urn=" in r.data
 
     def test_passage_html(self, client):
         r = client.get("/passage?file=" + urllib.parse.quote(SAMPLE) + "&ref=4")
@@ -183,7 +197,9 @@ class TestCatalogCache:
             calls["n"] += 1
             return real(path)
 
-        monkeypatch.setattr(browse, "read_meta", counting)
+        # web.create_app imports read_meta into its own module namespace, so patch
+        # it there (browse is the cllg_viewer package; browse.web is the submodule).
+        monkeypatch.setattr(browse.web, "read_meta", counting)
         app = browse.create_app(Path(DATA).resolve())
         app.testing = True
         client = app.test_client()
@@ -230,6 +246,62 @@ class TestParallelIndex:
         assert rows1 and rows1 == rows2
 
 
+# A minimal TEI whose *nested* citeStructure accumulates a unit name with a hyphen
+# ("chapter__column-or-fragment"), which dapytains feeds into a regex group name
+# -> re.match raises PatternError inside get_reffs (it resolves the parent's xpath
+# for the nested level).  Such files must be skipped and reported, never crash the
+# run.  (Reproduces the real tlg0300/tlg0294 failures.)
+_BROKEN_TEI = """<?xml version="1.0" encoding="utf-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader><fileDesc>
+    <titleStmt><title>Broken</title><author>Anon</author></titleStmt>
+    <publicationStmt><p>p</p></publicationStmt><sourceDesc><p>s</p></sourceDesc>
+  </fileDesc><encodingDesc><refsDecl>
+    <citeStructure match="/TEI/text/body/div" use="@n" unit="chapter">
+      <citeStructure match="div" use="@n" unit="column-or-fragment"/>
+    </citeStructure>
+  </refsDecl></encodingDesc></teiHeader>
+  <text><body>
+    <div n="1"><div n="1"><l n="1">x</l></div></div>
+  </body></text>
+</TEI>"""
+
+
+class TestResilientIndex:
+    """A document dapytains cannot navigate is skipped, not fatal."""
+
+    def test_broken_doc_skipped_others_indexed(self, tmp_path):
+        import shutil
+        import sqlite3
+        from pathlib import Path
+        root = tmp_path / "data"
+        good = root / "good0001" / "w001"
+        good.mkdir(parents=True)
+        shutil.copy(Path(DATA, SAMPLE), good / "good0001.w001.cllg-grc1.xml")
+        bad = root / "bad0001" / "w001"
+        bad.mkdir(parents=True)
+        (bad / "bad0001.w001.cllg-grc1.xml").write_text(_BROKEN_TEI, encoding="utf-8")
+
+        db = tmp_path / "search.sqlite"
+        assert browse.build_index(root, db, jobs=2) == 0  # must not raise/hang
+
+        files = {f for (f,) in sqlite3.connect(db).execute(
+            "SELECT DISTINCT file FROM passages")}
+        assert any("good0001" in f for f in files)      # good doc indexed
+        assert not any("bad0001" in f for f in files)   # broken doc absent
+
+        report = db.with_suffix(".skipped.tsv")
+        assert report.is_file()
+        assert "bad0001" in report.read_text(encoding="utf-8")
+
+    def test_worker_returns_error_not_raises(self, tmp_path):
+        p = tmp_path / "bad.cllg-grc1.xml"
+        p.write_text(_BROKEN_TEI, encoding="utf-8")
+        browse._worker_init()
+        rel, error, rows = browse._index_document(("bad.cllg-grc1.xml", str(p)))
+        assert error is not None and rows == []
+
+
 class TestNavigationSearch:
     """Always-on: search authors/works to navigate (no index required)."""
 
@@ -256,6 +328,11 @@ class TestNavigationSearch:
         r = client.get("/?q=" + urllib.parse.quote("Βασσαρικά"))
         assert b"passage matches" not in r.data
 
+    def test_text_scope_disabled_without_index(self, client):
+        # The "Inside texts" radio is present but disabled when full-text is off.
+        body = client.get("/").get_data(as_text=True)
+        assert 'value="text"' in body and "disabled" in body
+
 
 class TestOptionalFullText:
     """Opt-in full-text search engine (SQLite FTS5), enabled with enable_fts."""
@@ -276,18 +353,207 @@ class TestOptionalFullText:
 
     def test_fulltext_search_greek(self, client):
         # Greek search is accent-sensitive (SQLite folds Latin, not Greek).
-        r = client.get("/?q=" + urllib.parse.quote("Βασσαρικά"))
+        # Full-text now lives behind the "Inside texts" field (scope=text).
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
         body = r.get_data(as_text=True)
-        assert "passage matches" in body
+        assert "result-meta--top" in body   # results header rendered
         assert "<mark>" in body
 
+    def test_meta_scope_does_not_run_fulltext(self, client):
+        # The default "Works" field never runs the content engine.
+        body = client.get("/?q=" + urllib.parse.quote("Βασσαρικά")).get_data(as_text=True)
+        assert "result-meta--top" not in body
+
+    def test_betacode_input_searches_greek(self, client):
+        # Beta Code with the beta flag is converted server-side: Bassarika/
+        # "*bassarika/" -> Βασσαρικά, which then matches the indexed text.
+        r = client.get("/?scope=text&beta=1&q=" + urllib.parse.quote("*bassarika/"))
+        body = r.get_data(as_text=True)
+        assert "result-meta--top" in body
+        assert "Βασσαρικά" in body          # the converted query is echoed back
+
     def test_fulltext_off_when_not_enabled(self, fts_db):
-        # Same built index, but enable_fts=False -> no content hits.
+        # Same built index, but enable_fts=False -> text scope falls back to meta.
         root, db = fts_db
         app = browse.create_app(root, db_path=db, enable_fts=False)
         app.testing = True
-        r = app.test_client().get("/?q=" + urllib.parse.quote("Βασσαρικά"))
-        assert b"passage matches" not in r.data
+        r = app.test_client().get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά"))
+        assert b"result-meta--top" not in r.data
+
+    def test_wildcard_prefix(self, client):
+        # A trailing '*' is a prefix wildcard: Βασσαρικ* matches Βασσαρικά.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικ*"))
+        body = r.get_data(as_text=True)
+        assert "result-meta--top" in body
+        assert "Βασσαρικά" in body          # the matched token, in the snippet
+
+    def test_case_insensitive(self, client):
+        # unicode61 case-folds: a lowercase query matches the capitalised token.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("βασσαρικά"))
+        assert "result-meta--top" in r.get_data(as_text=True)
+
+    def test_pagination(self, client):
+        # τ* matches many passages -> multiple pages, with a working pager.
+        p1 = client.get("/?scope=text&q=" + urllib.parse.quote("τ*")
+                        + "&page=1").get_data(as_text=True)
+        p2 = client.get("/?scope=text&q=" + urllib.parse.quote("τ*")
+                        + "&page=2").get_data(as_text=True)
+        assert "Page <b>1</b>" in p1                      # "Page 1 of N" status
+        assert 'class="pagination"' in p1                 # numbered controls
+        assert "&amp;page=2" in p1 or "&page=2" in p1     # a page link
+        assert "Showing <b>1–8</b>" in p1                 # 8 per page
+        assert p1 != p2                                   # different results per page
+
+    def test_pagination_clamps_overflow(self, client):
+        # A page past the end clamps to the last page rather than erroring/empty.
+        r = client.get("/?scope=text&q=" + urllib.parse.quote("Βασσαρικά")
+                       + "&page=999")
+        assert r.status_code == 200
+        assert "result-meta--top" in r.get_data(as_text=True)
+
+
+    def test_fts_excerpts(self, fts_db):
+        _, db = fts_db
+        conn = browse.fts_connect(db)
+        row = conn.execute(
+            "SELECT file, tree, ref FROM passages WHERE leaf='1' LIMIT 1").fetchone()
+        key = (row[0], row[1], row[2])
+        ex = browse.fts_excerpts(conn, [key], length=50)
+        conn.close()
+        assert key in ex and ex[key]                 # non-empty excerpt
+        assert len(ex[key]) <= 51                     # truncated (+ ellipsis) or short
+
+
+class TestAbout:
+    @pytest.fixture(scope="class")
+    def client(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        return app.test_client()
+
+    def test_about_page(self, client):
+        r = client.get("/about")
+        assert r.status_code == 200
+        body = r.get_data(as_text=True)
+        assert "Corpus Liberatum Linguæ Graecæ" in body
+        assert "ANR-24-RRII-0002" in body
+        assert "Inria Quadrant" in body
+        assert "https://cllg-project.github.io/" in body
+
+    def test_about_link_in_header(self, client):
+        # the About link is in the shared header chrome, so it's on every page
+        body = client.get("/").get_data(as_text=True)
+        assert 'class="header-link" href="/about"' in body
+
+
+class TestAlphaRail:
+    """The A–Z jump rail relies on monotonic, unique letter dividers."""
+
+    def test_dividers_sorted_and_unique(self, monkeypatch, tmp_path):
+        import re
+        from pathlib import Path
+        root = tmp_path
+        authors = [("aaa", "Alpha Auctor"), ("vva", "[Valerius] Bracket"),
+                   ("vvb", "Valerius Real"), ("bbb", "Beta Auctor"),
+                   ("ttt", "Tatianus")]
+        paths = [root / f"{aid}/w/{aid}.w.x-grc1.xml" for aid, _ in authors]
+        meta = {str(p): {"title": "T", "author": name}
+                for p, (aid, name) in zip(paths, authors)}
+        monkeypatch.setattr(browse.web, "iter_editions", lambda r: paths)
+        monkeypatch.setattr(browse.web, "read_meta", lambda p: meta[str(p)])
+        monkeypatch.setattr(browse.web, "dts_identifier", lambda p: None)
+        app = browse.create_app(root)
+        app.testing = True
+        body = app.test_client().get("/").get_data(as_text=True)
+        ids = re.findall(r'id="alpha-([A-Z#])"', body)
+        assert ids == sorted(ids)              # monotonic
+        assert len(ids) == len(set(ids))       # no stray duplicate divider
+        # the bracketed pseudo-author folds under its real letter, not '['
+        assert ids.count("V") == 1 and "V" in ids
+
+
+class TestBetaHint:
+    """The β-code hint bar is hidden until the toggle is enabled."""
+
+    def _bar_tag(self, body):
+        import re
+        m = re.search(r'<div class="beta-hint"[^>]*id="hint-bar"[^>]*>', body)
+        return m.group(0) if m else ""
+
+    def test_hidden_when_beta_off(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        tag = self._bar_tag(app.test_client().get("/").get_data(as_text=True))
+        assert tag and "hidden" in tag
+
+    def test_visible_when_beta_on(self):
+        from pathlib import Path
+        app = browse.create_app(Path(DATA).resolve())
+        app.testing = True
+        tag = self._bar_tag(app.test_client().get("/?beta=1").get_data(as_text=True))
+        assert tag and "hidden" not in tag
+
+
+def test_fts_similarity_context_marks_shared():
+    import sqlite3
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        "CREATE VIRTUAL TABLE passages USING fts5(file UNINDEXED, tree UNINDEXED,"
+        " ref UNINDEXED, title, author, text, leaf UNINDEXED)")
+    conn.executemany(
+        "INSERT INTO passages(file,tree,ref,title,author,text,leaf)"
+        " VALUES (?,?,?,?,?,?,?)", [
+            ("f", "default", "1", "T", "A", "περὶ τῆς αὐθαδείας λόγος", "1"),
+            ("f", "default", "2", "T", "A", "ἄλλο τι περὶ αὐθαδείας", "1"),
+        ])
+    ctx = browse.fts_similarity_context(
+        conn, ("f", "default", "1"), [("f", "default", "2")])
+    c = ctx[("f", "default", "2")]
+    assert "<mark>" in c["snip"]                       # shared words highlighted
+    assert any("αὐθαδ" in w for w in c["shared"])      # and listed as chips
+    # short function words (τι, < 4 chars) are not treated as shared
+    assert "τι" not in c["shared"]
+
+
+def test_fts_query_string_wildcard_and_terms():
+    f = browse.fts_query_string
+    assert f("λογ*") == '"λογ"*'              # trailing * -> prefix
+    assert f("a b") == '"a" AND "b"'          # multi-term AND
+    assert f("Λόγος") == '"Λόγος"'            # plain quoted term
+    assert f("  ") == ""                       # empty -> empty (no MATCH)
+
+
+class TestBetacode:
+    """Beta Code -> Unicode Greek conversion (cllg_viewer.betacode.to_greek)."""
+
+    def test_lowercase_with_accents(self):
+        assert browse.to_greek("lo/gos") == "λόγος"
+        assert browse.to_greek("mh=nin") == "μῆνιν"
+
+    def test_breathings_and_uppercase(self):
+        assert browse.to_greek("a)/nqrwpos") == "ἄνθρωπος"
+        assert browse.to_greek("*)/anqrwpos") == "Ἄνθρωπος"  # diacritics after '*'
+        assert browse.to_greek("r(o/dos") == "ῥόδος"
+
+    def test_final_sigma(self):
+        assert browse.to_greek("qeo/s") == "θεός"           # word-final -> ς
+        assert browse.to_greek("ko/smos") == "κόσμος"
+
+    def test_iota_subscript_and_diaeresis(self):
+        assert browse.to_greek("a|") == "ᾳ"
+        assert browse.to_greek("i+") == "ϊ"
+
+    def test_non_letters_pass_through(self):
+        # Spaces are preserved (word boundaries survive), so multi-word search works.
+        assert browse.to_greek("lo/gos kai\\ qeo/s") == "λόγος καὶ θεός"
+
+    def test_idempotent_on_greek(self):
+        # Already-Greek text is untouched, so converting twice is safe (the server
+        # converts even when the JS field already produced Greek).
+        assert browse.to_greek("λόγος") == "λόγος"
+        assert browse.to_greek(browse.to_greek("lo/gos")) == "λόγος"
 
 
 class TestDtsLink:
