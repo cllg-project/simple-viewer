@@ -10,7 +10,7 @@ from typing import List
 from urllib.parse import urlencode
 
 from flask import (Flask, Response, abort, jsonify, render_template, request,
-                   send_file)
+                   send_file, url_for)
 from markupsafe import Markup
 
 from .betacode import to_greek
@@ -143,13 +143,15 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             params["tree"] = tree
         if fmt:
             params["format"] = fmt
-        return "/passage?" + urlencode(params)
+        return url_for("passage", **params)
+        # return "/passage?" + urlencode(params)
 
     def doc_url(file=None, tree=None, urn=None) -> str:
         urn = urn or (urn_for(file) if file else None)
         params = {"urn": urn} if urn else ({"file": file} if file else {})
         if tree:
             params["tree"] = tree
+        return url_for("doc", **params)
         return "/doc?" + urlencode(params)
 
     def stats_url(file=None, tree=None, ref=None, urn=None) -> str:
@@ -161,6 +163,7 @@ def create_app(root: Path, db_path: Path = DEFAULT_DB,
             params["tree"] = tree
         if ref:
             params["ref"] = ref
+        return url_for("stats_view", **params)
         return "/stats?" + urlencode(params)
 
     app.jinja_env.globals.update(passage_url=passage_url, doc_url=doc_url,

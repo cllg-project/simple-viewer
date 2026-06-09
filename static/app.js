@@ -56,25 +56,18 @@
     window.addEventListener("resize", publishStickyTop);
     if (window.ResizeObserver && search) new ResizeObserver(publishStickyTop).observe(search);
 
-    // Absolute document top via the offset chain — unlike getBoundingClientRect this
-    // is NOT skewed by the divider's own sticky paint offset, and unlike
-    // scrollIntoView() it actually scrolls *to* a sticky target (which Chromium
-    // otherwise treats as already-in-place, so upward jumps did nothing).
-    function docTop(el) {
-      var y = 0;
-      for (var n = el; n; n = n.offsetParent) y += n.offsetTop;
-      return y;
-    }
-
     alphaRail.addEventListener("click", function (e) {
       var link = e.target.closest('a[href^="#alpha-"]');
       if (!link) return;
       var target = document.getElementById(link.getAttribute("href").slice(1));
       if (!target) return;
       e.preventDefault();
-      // Land the target's flow-top exactly at the sticky line so its own divider
-      // pins at the top (the previous letter's divider then releases).
-      var y = Math.max(0, docTop(target) - chromeHeight());
+      // getBoundingClientRect().top + scrollY gives the natural document Y for any
+      // element that is not currently sticking. For a sticking divider (rect.top ≈
+      // chromeHeight) the result equals scrollY, which is a no-op — correct, since
+      // the target is already pinned at the top. This reliably handles upward jumps
+      // where offsetTop chains inside CSS Grid can return wrong values.
+      var y = Math.max(0, target.getBoundingClientRect().top + window.scrollY - chromeHeight());
       window.scrollTo({ top: y, behavior: "smooth" });
       if (history.replaceState) history.replaceState(null, "", link.getAttribute("href"));
     });
