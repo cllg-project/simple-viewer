@@ -3,7 +3,7 @@
 {% block header_meta %}{{ total }} works under <code>{{ root }}</code>{% endblock %}
 {% block content %}
 <div class="page">
-  <form class="search" action="/" method="get" style="position:sticky;top:56px;z-index:30">
+  <form class="search" action="{{url_for('home')}}" method="get" style="position:sticky;top:56px;z-index:30">
     <div class="wrap">
       <div class="search-inner">
         <div class="search-row">

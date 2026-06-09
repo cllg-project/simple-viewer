@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=GFS+Neohellenic:wght@400;700&family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Gentium+Plus:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-<link rel="stylesheet" href="/tei.css">
+<link rel="stylesheet" href="{{url_for('css')}}">
 <script>
 /* Apply a stored theme before first paint to avoid a flash. */
 (function () {
@@ -24,7 +24,7 @@
 <body>
 <div class="app">
   <header class="site-header">
-    <a class="brand" href="/" aria-label="CLLG Light — home">
+    <a class="brand" href="{{url_for('home')}}" aria-label="CLLG Light — home">
       <div class="monogram" aria-hidden="true">
         <span class="r1">C</span><span class="r1">L</span>
         <span class="r2">L</span><span class="r2">G</span>
@@ -37,7 +37,7 @@
     <div class="header-spacer"></div>
     <div class="header-meta">{% block header_meta %}{% endblock %}</div>
     <div class="header-actions">
-      <a class="header-link" href="/about">About</a>
+      <a class="header-link" href="{{url_for('about')}}">About</a>
       <button class="icon-btn" id="theme-toggle" title="Theme" aria-label="Toggle theme"></button>
     </div>
   </header>

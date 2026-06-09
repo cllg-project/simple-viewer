@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href="/">Home</a>
+  <a href="{{url_for('home')}}">Home</a>
   <span class="sep">›</span>
-  <a href="/?q={{ (meta.author or '')|urlencode }}">{{ meta.author or '—' }}</a>
+  <a href="{{url_for('home')}}?q={{ (meta.author or '')|urlencode }}">{{ meta.author or '—' }}</a>
   <span class="sep">›</span>
   {% if current %}
     <a href="{{ doc_url(file, tree) }}" lang="la">{{ meta.title }}</a>
