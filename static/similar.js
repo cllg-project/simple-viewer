@@ -132,7 +132,7 @@
     var params = new URLSearchParams({ ref: sec.dataset.ref, tree: sec.dataset.tree });
     if (sec.dataset.urn) { params.set("urn", sec.dataset.urn); }
     else { params.set("file", sec.dataset.file); }
-    return fetch("/similar?" + params.toString())
+    return fetch("/cllg/similar?" + params.toString())
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var hits = (data && data.hits) || [];
